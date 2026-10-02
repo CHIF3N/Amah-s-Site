@@ -18,9 +18,8 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
   onToggleDateNight,
 }) => {
   const [imgError, setImgError] = useState(false);
-  const posterUrl = anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url;
-
-  const isRecent = anime.year && anime.year >= 2023;
+  const posterUrl = anime?.images?.webp?.large_image_url || anime?.images?.jpg?.large_image_url || anime?.images?.jpg?.image_url;
+  const isRecent = anime?.year && anime.year >= 2023;
 
   return (
     <div className="group relative flex flex-col bg-[#071711]/60 border border-emerald-900/40 rounded-xl overflow-hidden hover:border-emerald-400/50 transition-all duration-300 hover:shadow-xl hover:shadow-emerald-950/40">
@@ -30,7 +29,7 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
         {!imgError && posterUrl ? (
           <img
             src={posterUrl}
-            alt={anime.title}
+            alt={anime?.title || 'Anime poster'}
             referrerPolicy="no-referrer"
             onError={() => setImgError(true)}
             loading="lazy"
@@ -39,18 +38,18 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-b from-[#061e15] to-[#04120d] text-center">
             <Leaf className="w-8 h-8 text-emerald-400 mb-2 opacity-80" />
-            <p className="text-xs font-semibold text-emerald-200 line-clamp-2">{anime.title}</p>
+            <p className="text-xs font-semibold text-emerald-200 line-clamp-2">{anime?.title || 'Unknown Title'}</p>
           </div>
         )}
 
         {/* Contrast Scrim for Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-black/30 pointer-events-none" />
 
-        {/* Demigod Recommendation Crown / Herb Indicator (Top Left) */}
-        {anime.chif3nNote && (
-          <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-black/70 backdrop-blur-md px-2 py-0.5 rounded text-[11px] font-medium text-amber-300 border border-amber-500/40">
-            <Sparkles className="w-3 h-3 text-amber-400" />
-            <span>Maomao Pick</span>
+        {/* Demigod's Pick ❤️ Glowing Badge */}
+        {anime?.chif3nNote && (
+          <div className="absolute top-2 left-2 flex items-center gap-1 bg-black/75 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-semibold text-amber-300 border border-amber-500/50 shadow-md shadow-amber-950/50">
+            <Sparkles className="w-3 h-3 text-amber-400 fill-amber-400/40" />
+            <span>Demigod's Pick ❤️</span>
           </div>
         )}
 
@@ -61,7 +60,7 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
             onToggleDateNight(anime);
           }}
           title={isDateNightSaved ? 'Saved in Date Night Queue' : 'Save for Date Night'}
-          className={`absolute top-2.5 right-2.5 p-1.5 rounded-full backdrop-blur-md border transition-all ${
+          className={`absolute top-2 right-2 p-1.5 rounded-full backdrop-blur-md border transition-all ${
             isDateNightSaved
               ? 'bg-rose-600/90 text-white border-rose-400 scale-105 shadow-md'
               : 'bg-black/50 text-zinc-300 border-white/10 hover:text-rose-300 hover:bg-black/80'
@@ -92,19 +91,19 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
       {/* Card Content & Zero-Pill Unboxed Metadata */}
       <div className="p-3 flex flex-col flex-1 justify-between">
         <div>
-          {/* Metadata line with typographic separators (anti-slop: NO pills!) */}
+          {/* Metadata line with typographic separators */}
           <div className="flex items-center gap-1.5 text-[11px] text-emerald-300/80 mb-1">
-            {anime.score && (
+            {anime?.score && (
               <span className="flex items-center gap-0.5 text-amber-300 font-medium">
                 <Star className="w-3 h-3 fill-amber-300" />
                 <span className="tabular-nums">{anime.score.toFixed(1)}</span>
               </span>
             )}
-            {anime.score && <span aria-hidden="true" className="text-emerald-800">·</span>}
+            {anime?.score && <span aria-hidden="true" className="text-emerald-800">·</span>}
             <span className="tabular-nums font-mono text-emerald-200/90">
-              {anime.episodes ? `${anime.episodes} eps` : 'Ongoing'}
+              {anime?.episodes ? `${anime.episodes} eps` : 'Ongoing'}
             </span>
-            {anime.year && (
+            {anime?.year && (
               <>
                 <span aria-hidden="true" className="text-emerald-800">·</span>
                 <span className={isRecent ? 'text-amber-300 font-semibold' : 'text-emerald-400/80'}>
@@ -116,16 +115,16 @@ export const AnimeCard: React.FC<AnimeCardProps> = ({
 
           <h3
             onClick={() => onOpenDetails(anime)}
-            className="text-sm font-medium text-emerald-50 group-hover:text-emerald-300 transition-colors line-clamp-1 cursor-pointer"
-            title={anime.title_english || anime.title}
+            className="text-sm font-medium text-emerald-50 group-hover:text-amber-300 transition-colors line-clamp-1 cursor-pointer font-cinzel"
+            title={anime?.title_english || anime?.title}
           >
-            {anime.title_english || anime.title}
+            {anime?.title_english || anime?.title}
           </h3>
 
-          {/* Quiet genre tags without pill boxes */}
-          {anime.genres && anime.genres.length > 0 && (
-            <p className="text-[11px] text-emerald-400/70 truncate mt-0.5">
-              {anime.genres.slice(0, 2).map((g) => g.name).join(' · ')}
+          {/* Clean 2-line synopsis preview (Open-Otaku compact ergonomics) */}
+          {anime?.synopsis && (
+            <p className="text-[11px] text-emerald-400/70 line-clamp-2 mt-1 leading-snug">
+              {anime.synopsis}
             </p>
           )}
         </div>

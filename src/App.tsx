@@ -15,14 +15,21 @@ import {
   Leaf,
   FlaskConical,
   Clock,
-  ArrowUpDown
+  ArrowUpDown,
+  BookOpen,
+  Feather,
+  Quote
 } from 'lucide-react';
 import { Navbar } from './components/Navbar';
+import { BottomNav } from './components/BottomNav';
 import { VideoPlayer } from './components/VideoPlayer';
 import { AnimeCard } from './components/AnimeCard';
 import { AnimeDetailModal } from './components/AnimeDetailModal';
 import { DateNightQueue } from './components/DateNightQueue';
 import { DemigodLoveScrolls } from './components/DemigodLoveScrolls';
+import { DemigodPoetryDrawer } from './components/DemigodPoetryDrawer';
+import { MangaReaderArchive } from './components/MangaReaderArchive';
+import { LightNovelArchive } from './components/LightNovelArchive';
 import { ApothecaryPrescriptionCabinet } from './components/ApothecaryPrescriptionCabinet';
 import { WatchActivityChart } from './components/WatchActivityChart';
 import { AmbientCanvas } from './components/AmbientCanvas';
@@ -31,7 +38,7 @@ import { CURATED_ANIME, DEMIGOD_SCROLLS, MAOMAO_STATEMENTS_FOR_LESLYE } from './
 import { searchAnime, fetchRecentAnime, sortAnimeByRecent } from './services/jikanApi';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'browse' | 'demigod-picks' | 'date-night' | 'love-scrolls'>('browse');
+  const [activeTab, setActiveTab] = useState<'browse' | 'manga' | 'novels' | 'demigod-picks' | 'date-night' | 'love-scrolls'>('browse');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<AnimeItem[] | null>(null);
@@ -46,11 +53,24 @@ export default function App() {
   // Detail Modal
   const [detailAnime, setDetailAnime] = useState<AnimeItem | null>(null);
 
+  // Demigod Poetry Drawer
+  const [poetryDrawerOpen, setPoetryDrawerOpen] = useState(false);
+
   // Ambience mode
   const [ambientMode, setAmbientMode] = useState<'stars' | 'sakura' | 'off'>('stars');
 
+  // Rotating poetic dedication index
+  const [bannerStatementIdx, setBannerStatementIdx] = useState(0);
+
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setBannerStatementIdx((prev) => (prev + 1) % MAOMAO_STATEMENTS_FOR_LESLYE.length);
+    }, 7000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Persisted state: Date Night queue
   const [dateNightItems, setDateNightItems] = useState<DateNightItem[]>(() => {
@@ -98,7 +118,7 @@ export default function App() {
         episode: 5,
         totalEpisodes: 24,
         lastWatchedAt: Date.now() - 1000 * 60 * 30,
-        server: 'Jade Palace (VidSrc)',
+        server: 'VidSrc Celestial (Vial I)',
       },
       {
         malId: 52991,
@@ -107,7 +127,7 @@ export default function App() {
         episode: 14,
         totalEpisodes: 28,
         lastWatchedAt: Date.now() - 1000 * 60 * 180,
-        server: 'Imperial Archive',
+        server: 'Embed.su (Vial II)',
       },
       {
         malId: 57334,
@@ -116,7 +136,7 @@ export default function App() {
         episode: 4,
         totalEpisodes: 12,
         lastWatchedAt: Date.now() - 1000 * 60 * 60 * 24,
-        server: 'Apothecary Mirror',
+        server: 'VidSrc Me (Vial III)',
       }
     ];
   });
@@ -182,7 +202,7 @@ export default function App() {
     } catch (e) {}
   }, [leslyeNotes]);
 
-  // Initial load recent releases from Jikan
+  // Initial load recent releases from Jikan / AniList
   useEffect(() => {
     let isMounted = true;
     fetchRecentAnime().then((data) => {
@@ -227,15 +247,15 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Select anime by title string (from Prescription Cabinet)
+  // Select anime by title string
   const handleSelectAnimeByName = (animeTitle: string) => {
     const matched = animeCatalog.find((a) =>
-      a.title.toLowerCase().includes(animeTitle.toLowerCase()) ||
-      (a.title_english && a.title_english.toLowerCase().includes(animeTitle.toLowerCase()))
+      a?.title?.toLowerCase().includes(animeTitle.toLowerCase()) ||
+      (a?.title_english && a.title_english.toLowerCase().includes(animeTitle.toLowerCase()))
     ) || CURATED_ANIME[0];
 
     handlePlayAnime(matched, 1);
-    showToast(`🌿 Dispensed remedy: Playing "${matched.title_english || matched.title}"!`);
+    showToast(`🌿 Dispensed remedy: Playing "${matched?.title_english || matched?.title}"!`);
   };
 
   // Mark watched in history and increment weekly activity
@@ -244,15 +264,15 @@ export default function App() {
     if (!anime) return;
     setWatchHistory((prev) => {
       const filtered = prev.filter((item) => item.malId !== malId);
-      const poster = anime.images?.webp?.image_url || anime.images?.jpg?.image_url;
+      const poster = anime?.images?.webp?.image_url || anime?.images?.jpg?.image_url || '';
       const updated: WatchHistoryItem = {
         malId,
-        title: anime.title_english || anime.title,
+        title: anime?.title_english || anime?.title || 'Anime Stream',
         image: poster,
         episode: ep,
-        totalEpisodes: anime.episodes || null,
+        totalEpisodes: anime?.episodes || null,
         lastWatchedAt: Date.now(),
-        server: 'Jade Palace (VidSrc)',
+        server: 'VidSrc Celestial (Vial I)',
       };
       return [updated, ...filtered].slice(0, 10);
     });
@@ -271,24 +291,24 @@ export default function App() {
 
   // Weekly activity metrics
   const totalThisWeek = useMemo(() => {
-    return activityData.reduce((acc, curr) => acc + curr.episodes, 0);
+    return activityData.reduce((acc, curr) => acc + (curr?.episodes || 0), 0);
   }, [activityData]);
 
   const streakDays = useMemo(() => {
-    return activityData.filter((d) => d.episodes > 0).length;
+    return activityData.filter((d) => d?.episodes > 0).length;
   }, [activityData]);
 
   // Toggle Date Night item
   const handleToggleDateNight = (anime: AnimeItem) => {
-    const exists = dateNightItems.some((i) => i.malId === anime.mal_id);
+    const exists = dateNightItems.some((i) => i.malId === anime?.mal_id);
     if (exists) {
-      setDateNightItems((prev) => prev.filter((i) => i.malId !== anime.mal_id));
-      showToast(`Removed "${anime.title_english || anime.title}" from Date Night`);
+      setDateNightItems((prev) => prev.filter((i) => i.malId !== anime?.mal_id));
+      showToast(`Removed "${anime?.title_english || anime?.title}" from Date Night`);
     } else {
-      const poster = anime.images?.webp?.image_url || anime.images?.jpg?.image_url;
+      const poster = anime?.images?.webp?.image_url || anime?.images?.jpg?.image_url || '';
       const newItem: DateNightItem = {
-        malId: anime.mal_id,
-        title: anime.title_english || anime.title,
+        malId: anime?.mal_id || Date.now(),
+        title: anime?.title_english || anime?.title || 'Date Night Anime',
         image: poster,
         addedAt: Date.now(),
         watched: false,
@@ -296,7 +316,7 @@ export default function App() {
         coupleComment: 'Handpicked for date night with Sir Chif3n 💚'
       };
       setDateNightItems((prev) => [newItem, ...prev]);
-      showToast(`Added "${anime.title_english || anime.title}" to Date Night Queue! 🌿`);
+      showToast(`Added "${anime?.title_english || anime?.title}" to Date Night Queue! 🌿`);
     }
   };
 
@@ -307,14 +327,13 @@ export default function App() {
     }, 4000);
   };
 
-  // Taste test / Surprise me randomizer
+  // Taste test randomizer
   const handleSurpriseMe = () => {
     const pool = searchResults || animeCatalog;
     const picked = pool[Math.floor(Math.random() * pool.length)];
     if (picked) {
       handlePlayAnime(picked, 1);
-      const quote = MAOMAO_STATEMENTS_FOR_LESLYE[Math.floor(Math.random() * MAOMAO_STATEMENTS_FOR_LESLYE.length)];
-      showToast(`✨ Demigod Decree: "${picked.title_english || picked.title}" passed the poison test!`);
+      showToast(`✨ Demigod Decree: "${picked?.title_english || picked?.title}" passed the poison test!`);
     }
   };
 
@@ -332,20 +351,20 @@ export default function App() {
     // Genre filter
     const genreFiltered = list.filter((anime) => {
       if (selectedGenre === 'All') return true;
-      return anime.genres?.some((g) => g.name.toLowerCase().includes(selectedGenre.toLowerCase()));
+      return anime?.genres?.some((g) => g?.name?.toLowerCase().includes(selectedGenre.toLowerCase()));
     });
 
     // Ranking order (Defaults strictly to most recent anime first)
     return [...genreFiltered].sort((a, b) => {
       if (sortOrder === 'recent') {
-        const yearA = a.year || (a.status === 'Currently Airing' ? 2025 : 2020);
-        const yearB = b.year || (b.status === 'Currently Airing' ? 2025 : 2020);
-        if (yearB !== yearA) return yearB - yearA; // Newest first
-        return (b.score || 0) - (a.score || 0);
+        const yearA = a?.year || (a?.status === 'Currently Airing' ? 2025 : 2020);
+        const yearB = b?.year || (b?.status === 'Currently Airing' ? 2025 : 2020);
+        if (yearB !== yearA) return yearB - yearA;
+        return (b?.score || 0) - (a?.score || 0);
       } else if (sortOrder === 'score') {
-        return (b.score || 0) - (a.score || 0);
+        return (b?.score || 0) - (a?.score || 0);
       } else {
-        return (a.title_english || a.title).localeCompare(b.title_english || b.title);
+        return (a?.title_english || a?.title || '').localeCompare(b?.title_english || b?.title || '');
       }
     });
   }, [searchResults, animeCatalog, selectedGenre, sortOrder]);
@@ -353,86 +372,109 @@ export default function App() {
   const genresList = ['All', 'Mystery', 'Drama', 'Romance', 'Action', 'Fantasy', 'Comedy', 'Supernatural'];
 
   return (
-    <div className="min-h-screen bg-[#040c08] text-emerald-50 flex flex-col selection:bg-emerald-500/30 selection:text-emerald-200 relative">
-      {/* Ambient jade fireflies & lotus petals */}
+    <div className="min-h-screen bg-[#040c08] text-emerald-50 flex flex-col selection:bg-emerald-500/30 selection:text-emerald-200 relative pb-16 md:pb-0">
+      {/* Ambient Canvas */}
       <AmbientCanvas enabled={ambientMode !== 'off'} mode={ambientMode} />
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-xl bg-[#061e14]/95 border border-emerald-500/50 shadow-2xl text-xs sm:text-sm text-emerald-100 backdrop-blur-md flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 max-w-md">
+        <div className="fixed bottom-16 md:bottom-6 right-4 md:right-6 z-50 p-4 rounded-xl bg-[#061e14]/95 border border-emerald-500/50 shadow-2xl text-xs sm:text-sm text-emerald-100 backdrop-blur-md flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 max-w-md">
           <Leaf className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="font-medium">{toastMessage}</span>
         </div>
       )}
 
-      {/* Top Bar Contract Navbar */}
+      {/* Demigod Poetry & Vows Modal */}
+      <DemigodPoetryDrawer
+        isOpen={poetryDrawerOpen}
+        onClose={() => setPoetryDrawerOpen(false)}
+      />
+
+      {/* Navbar with Open-Otaku & Demigod styling */}
       <Navbar
         activeTab={activeTab}
         onSelectTab={(tab) => {
           setActiveTab(tab);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        onSurpriseMe={handleSurpriseMe}
+        onOpenPoetry={() => setPoetryDrawerOpen(true)}
         ambientMode={ambientMode}
         onToggleAmbient={handleToggleAmbient}
         dateNightCount={dateNightItems.length}
       />
 
+      {/* Floating Rotating Parchment Dedication Banner */}
+      <aside 
+        aria-label="Daily dedication banner"
+        className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-3">
+        <div 
+          onClick={() => setPoetryDrawerOpen(true)}
+          className="p-2.5 sm:p-3 rounded-xl bg-gradient-to-r from-emerald-950/70 via-[#072418] to-amber-950/60 border border-emerald-500/30 flex items-center justify-between gap-3 text-xs cursor-pointer hover:border-amber-400/50 transition-all shadow-md group"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="p-1 rounded bg-amber-400/20 text-amber-300 font-bold font-cinzel text-[10px] uppercase shrink-0">
+              Demigod Dedication
+            </span>
+            <p className="text-emerald-100 italic truncate font-serif text-xs sm:text-sm">
+              {MAOMAO_STATEMENTS_FOR_LESLYE[bannerStatementIdx]}
+            </p>
+          </div>
+          <span className="text-[11px] text-amber-300 group-hover:underline shrink-0 hidden sm:inline">
+            Read Poems & Vows →
+          </span>
+        </div>
+      </aside>
+
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8 relative z-20">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 space-y-8 relative z-20">
         
-        {/* Stream Player Section (If an anime is currently active) */}
+        {/* Stream Player Section (Immediate Viewport Rollout) */}
         {currentPlayingAnime && (
           <VideoPlayer
             anime={currentPlayingAnime}
             episode={currentEpisode}
             onEpisodeChange={(ep) => setCurrentEpisode(ep)}
             onClose={() => setCurrentPlayingAnime(null)}
-            isDateNightSaved={dateNightItems.some((i) => i.malId === currentPlayingAnime.mal_id)}
+            isDateNightSaved={dateNightItems.some((i) => i.malId === currentPlayingAnime?.mal_id)}
             onToggleDateNight={handleToggleDateNight}
             onMarkWatched={handleRecordHistory}
           />
         )}
 
-        {/* View 1: Main Browse & Catalog */}
+        {/* Tab 1: Anime Catalog & Streaming */}
         {activeTab === 'browse' && (
-          <div className="space-y-10 animate-in fade-in">
-            {/* Hero Dedication: Maomao & Demigod Apothecary Header */}
+          <div className="space-y-8 animate-in fade-in">
+            {/* Hero Dedication Header */}
             {!currentPlayingAnime && (
-              <div className="relative rounded-2xl p-6 sm:p-10 overflow-hidden bg-gradient-to-br from-[#06241a] via-[#04150f] to-[#0c261c] border border-emerald-500/30 shadow-2xl">
-                {/* Emerald & Amber Atmosphere Glows */}
-                <div className="absolute top-0 right-1/4 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute bottom-0 right-0 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
+              <div className="relative rounded-2xl p-6 sm:p-8 overflow-hidden bg-gradient-to-br from-[#06241a] via-[#04150f] to-[#0c261c] border border-emerald-500/30 shadow-2xl">
                 <div className="relative z-10 max-w-3xl">
-                  {/* Dedication Kicker */}
-                  <div className="flex items-center gap-2 mb-3">
+                  <div className="flex items-center gap-2 mb-2">
                     <span className="font-cinzel text-xs uppercase tracking-widest text-amber-300 font-bold flex items-center gap-1.5">
                       <Leaf className="w-3.5 h-3.5 text-emerald-400" />
                       <span>Dedicated to Leslye from her Demigod Boyfriend Sir Chif3n</span>
                     </span>
                     <span className="text-emerald-700">·</span>
-                    <span className="text-xs text-emerald-300 italic">Maomao Imperial Edition</span>
+                    <span className="text-xs text-emerald-300 italic">Maomao Sanctuary</span>
                   </div>
 
                   <h1 className="font-cinzel text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight leading-tight">
-                    Lady Leslye's Imperial Apothecary & Stream.
+                    Where Every Scroll Begins With You.
                   </h1>
 
-                  <p className="text-sm sm:text-base text-emerald-100/90 mt-3 leading-relaxed max-w-2xl font-normal">
-                    Where sharp wit meets celestial devotion. Explore the newest anime releases first, sample Maomao's herbal love prescriptions, and enjoy peaceful date night marathons with your demigod.
+                  <p className="text-xs sm:text-sm text-emerald-100/90 mt-2.5 leading-relaxed max-w-2xl font-normal">
+                    Ad-free streaming sanctuary powered by multi-server resilience. Explore the latest 2024–2025 releases, read MangaDex scrolls, and relax in imperial comfort.
                   </p>
 
-                  {/* Search Bar & Instant Launch */}
-                  <form onSubmit={handleSearch} className="mt-6 flex flex-col sm:flex-row gap-2 max-w-2xl">
+                  {/* Search Bar */}
+                  <form onSubmit={handleSearch} className="mt-5 flex flex-col sm:flex-row gap-2 max-w-2xl">
                     <div className="relative flex-1">
                       <Search className="w-4 h-4 text-emerald-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
                       <input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search any anime (e.g. Apothecary Diaries, Frieren, Dandadan, Solo Leveling)..."
-                        className="w-full bg-[#030e09]/90 border border-emerald-800/80 rounded-xl pl-10 pr-10 py-3 text-sm text-white placeholder-emerald-700 focus:outline-none focus:border-emerald-400 shadow-inner"
+                        placeholder="Search anime (e.g. Apothecary Diaries, Frieren, Dandadan, Solo Leveling)..."
+                        className="w-full bg-[#030e09]/90 border border-emerald-800/80 rounded-xl pl-10 pr-10 py-2.5 text-xs sm:text-sm text-white placeholder-emerald-700 focus:outline-none focus:border-emerald-400 shadow-inner"
                       />
                       {searchQuery && (
                         <button
@@ -447,15 +489,15 @@ export default function App() {
                     <button
                       type="submit"
                       disabled={isSearching}
-                      className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-amber-600 hover:from-emerald-500 hover:to-amber-500 text-white text-xs sm:text-sm font-semibold transition-all shadow-md active:scale-95 disabled:opacity-50 whitespace-nowrap"
+                      className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-amber-600 hover:from-emerald-500 hover:to-amber-500 text-white text-xs sm:text-sm font-semibold transition-all shadow-md active:scale-95 disabled:opacity-50 whitespace-nowrap"
                     >
-                      {isSearching ? 'Examining Scrolls...' : 'Search Library'}
+                      {isSearching ? 'Searching...' : 'Search Anime'}
                     </button>
                   </form>
 
-                  {/* Quick recommendation chips (Recent & Popular for Leslye) */}
-                  <div className="flex items-center gap-2 mt-4 text-xs text-emerald-300/80 flex-wrap">
-                    <span className="text-emerald-500">Curated for Lady Leslye:</span>
+                  {/* Quick Tags */}
+                  <div className="flex items-center gap-2 mt-3.5 text-xs text-emerald-300/80 flex-wrap">
+                    <span className="text-emerald-500">Curated for Leslye:</span>
                     {['The Apothecary Diaries', 'Dandadan', 'Frieren', 'Solo Leveling', 'Wind Breaker', 'Horimiya'].map((tag) => (
                       <button
                         key={tag}
@@ -473,12 +515,12 @@ export default function App() {
               </div>
             )}
 
-            {/* Interactive Maomao Prescriptions & Quotes Cabinet */}
+            {/* Prescriptions Cabinet */}
             {!searchResults && (
               <ApothecaryPrescriptionCabinet onSelectAnimeByName={handleSelectAnimeByName} />
             )}
 
-            {/* Continue Streaming Section with Weekly Progress Activity Chart (Recharts) */}
+            {/* Continue Streaming Section with Weekly Progress Activity Chart */}
             {!searchResults && (
               <section className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -496,7 +538,7 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Small activity chart visualizing episodes watched each day of the week */}
+                {/* Small Recharts Activity Chart */}
                 <WatchActivityChart
                   activityData={activityData}
                   totalThisWeek={totalThisWeek}
@@ -542,13 +584,13 @@ export default function App() {
             )}
 
             {/* Main Catalog Header & Sorting Options */}
-            <section className="space-y-5 pt-2">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-emerald-900/60 pb-3">
+            <section className="space-y-4 pt-1">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-emerald-900/60 pb-3">
                 <div>
                   <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 font-cinzel">
                     <Compass className="w-4 h-4 text-emerald-400" />
                     <span>
-                      {searchResults ? `Search Results (${filteredAndSortedCatalog.length})` : 'Recent Anime Library'}
+                      {searchResults ? `Search Results (${filteredAndSortedCatalog.length})` : 'Anime Library'}
                     </span>
                   </h2>
                   <p className="text-xs text-emerald-400/80 mt-0.5">
@@ -558,24 +600,22 @@ export default function App() {
                   </p>
                 </div>
 
-                {/* Controls: Ranking Sort & Genre Filter */}
+                {/* Controls */}
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* Sorting dropdown / toggle */}
                   <div className="flex items-center gap-1.5 bg-[#030e09] border border-emerald-900/80 rounded-lg px-2.5 py-1 text-xs">
                     <ArrowUpDown className="w-3.5 h-3.5 text-emerald-400" />
-                    <span className="text-emerald-500">Rank By:</span>
+                    <span className="text-emerald-500">Rank:</span>
                     <select
                       value={sortOrder}
                       onChange={(e) => setSortOrder(e.target.value as any)}
                       className="bg-transparent text-emerald-200 font-medium focus:outline-none cursor-pointer"
                     >
-                      <option value="recent" className="bg-[#040e0a] text-white">Newest First (Default)</option>
+                      <option value="recent" className="bg-[#040e0a] text-white">Newest First</option>
                       <option value="score" className="bg-[#040e0a] text-white">Highest Score</option>
                       <option value="alphabetical" className="bg-[#040e0a] text-white">Title A-Z</option>
                     </select>
                   </div>
 
-                  {/* Genre Filter Buttons */}
                   <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
                     {genresList.map((genre) => (
                       <button
@@ -599,13 +639,12 @@ export default function App() {
                 <div className="py-16 text-center rounded-2xl border border-emerald-900/60 bg-[#061710]/30">
                   <Film className="w-10 h-10 text-emerald-700 mx-auto mb-2" />
                   <p className="text-sm text-emerald-200 font-medium">No anime matching your filter</p>
-                  <p className="text-xs text-emerald-500 mt-1 mb-4">Try selecting "All" or a different search term.</p>
                   <button
                     onClick={() => {
                       setSelectedGenre('All');
                       handleClearSearch();
                     }}
-                    className="px-4 py-2 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-xs text-emerald-200"
+                    className="mt-3 px-4 py-2 rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-xs text-emerald-200"
                   >
                     Reset Filters
                   </button>
@@ -618,7 +657,7 @@ export default function App() {
                       anime={anime}
                       onPlay={(a) => handlePlayAnime(a, 1)}
                       onOpenDetails={(a) => setDetailAnime(a)}
-                      isDateNightSaved={dateNightItems.some((i) => i.malId === anime.mal_id)}
+                      isDateNightSaved={dateNightItems.some((i) => i.malId === anime?.mal_id)}
                       onToggleDateNight={handleToggleDateNight}
                     />
                   ))}
@@ -628,16 +667,26 @@ export default function App() {
           </div>
         )}
 
-        {/* View 2: Maomao's Herbs & Demigod Picks */}
+        {/* Tab 2: Manga Archives (MangaDex Integration) */}
+        {activeTab === 'manga' && (
+          <MangaReaderArchive />
+        )}
+
+        {/* Tab 3: Light Novels Shelf */}
+        {activeTab === 'novels' && (
+          <LightNovelArchive />
+        )}
+
+        {/* Tab 4: Demigod's Picks */}
         {activeTab === 'demigod-picks' && (
           <div className="space-y-6 animate-in fade-in">
-            <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-[#06241a] via-[#04150f] to-[#0c261c] border border-emerald-500/40">
+            <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-[#06241a] via-[#04150f] to-[#0c261c] border border-amber-500/40">
               <div className="max-w-2xl">
                 <span className="font-cinzel text-xs font-bold text-amber-300 uppercase tracking-widest block mb-1">
-                  Maomao-Approved Imperial Archive
+                  👑 Sacred Royal Vault
                 </span>
                 <h1 className="font-cinzel text-2xl sm:text-3xl font-bold text-white">
-                  Sir Chif3n's Handpicked Picks for Lady Leslye
+                  Demigod's Handpicked Picks for Lady Leslye ❤️
                 </h1>
                 <p className="text-xs sm:text-sm text-emerald-200/90 mt-2 leading-relaxed">
                   Every series in this vault was carefully reviewed by your demigod boyfriend for mystery, romance, emotional impact, and peerless animation quality—ranked with recent anime first!
@@ -652,7 +701,7 @@ export default function App() {
                   anime={anime}
                   onPlay={(a) => handlePlayAnime(a, 1)}
                   onOpenDetails={(a) => setDetailAnime(a)}
-                  isDateNightSaved={dateNightItems.some((i) => i.malId === anime.mal_id)}
+                  isDateNightSaved={dateNightItems.some((i) => i.malId === anime?.mal_id)}
                   onToggleDateNight={handleToggleDateNight}
                 />
               ))}
@@ -660,7 +709,7 @@ export default function App() {
           </div>
         )}
 
-        {/* View 3: Date Night Queue */}
+        {/* Tab 5: Date Night Queue */}
         {activeTab === 'date-night' && (
           <DateNightQueue
             items={dateNightItems}
@@ -695,7 +744,7 @@ export default function App() {
           />
         )}
 
-        {/* View 4: Love Scrolls & Messages */}
+        {/* Tab 6: Love Scrolls & Decrees */}
         {activeTab === 'love-scrolls' && (
           <DemigodLoveScrolls
             scrolls={DEMIGOD_SCROLLS}
@@ -716,13 +765,22 @@ export default function App() {
         )}
       </main>
 
+      {/* Floating Bottom Nav for Mobile Ergonomics (Open-Otaku style) */}
+      <BottomNav
+        activeTab={activeTab === 'date-night' || activeTab === 'love-scrolls' ? 'browse' : activeTab}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
+
       {/* Anime Detail Modal */}
       {detailAnime && (
         <AnimeDetailModal
           anime={detailAnime}
           onClose={() => setDetailAnime(null)}
           onPlay={(a) => handlePlayAnime(a, 1)}
-          isDateNightSaved={dateNightItems.some((i) => i.malId === detailAnime.mal_id)}
+          isDateNightSaved={dateNightItems.some((i) => i.malId === detailAnime?.mal_id)}
           onToggleDateNight={handleToggleDateNight}
         />
       )}
@@ -731,16 +789,17 @@ export default function App() {
       <footer className="mt-16 border-t border-emerald-900/60 bg-[#030906] py-8 text-xs text-emerald-400/80 relative z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-cinzel font-bold text-sm text-emerald-200">LESLYE'S APOTHECARY</span>
+            <span className="font-cinzel font-bold text-sm text-emerald-200">LESLYE'S REALM</span>
             <span className="text-emerald-800">·</span>
             <span className="text-emerald-400">Crafted with celestial devotion by Sir Chif3n</span>
           </div>
 
-          <div className="flex items-center gap-6 text-emerald-400/80 text-xs">
-            <button onClick={() => setActiveTab('browse')} className="hover:text-white transition-colors">Recent Catalog</button>
-            <button onClick={() => setActiveTab('demigod-picks')} className="hover:text-white transition-colors">Maomao's Picks</button>
-            <button onClick={() => setActiveTab('date-night')} className="hover:text-white transition-colors">Date Night Queue</button>
-            <button onClick={() => setActiveTab('love-scrolls')} className="hover:text-white transition-colors">Imperial Scrolls</button>
+          <div className="flex flex-wrap items-center gap-5 text-emerald-400/80 text-xs">
+            <button onClick={() => setActiveTab('browse')} className="hover:text-white transition-colors">🌿 Anime</button>
+            <button onClick={() => setActiveTab('manga')} className="hover:text-white transition-colors">📜 MangaDex</button>
+            <button onClick={() => setActiveTab('novels')} className="hover:text-white transition-colors">📖 Light Novels</button>
+            <button onClick={() => setActiveTab('demigod-picks')} className="hover:text-white transition-colors">👑 Demigod's Picks</button>
+            <button onClick={() => setPoetryDrawerOpen(true)} className="hover:text-amber-300 transition-colors">✨ Vows & Poetry</button>
           </div>
         </div>
       </footer>

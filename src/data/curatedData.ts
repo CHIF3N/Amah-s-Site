@@ -1,13 +1,109 @@
-import { AnimeItem, DemigodScroll, ApothecaryPrescription } from '../types/anime';
+import { AnimeItem, DemigodScroll, ApothecaryPrescription, LightNovelItem } from '../types/anime';
 
 export const MAOMAO_STATEMENTS_FOR_LESLYE = [
+  "\"Even the deadliest poison in the imperial palace cannot rival the sweetness of your presence.\"",
+  "\"Curated by her Demigod. Every frame, every scroll, gathered solely for Leslye's peace.\"",
+  "\"Like Maomao testing rare herbs in the moonlight, I searched the archives to bring you a world untouched by bitter ads.\"",
   "\"Just like Maomao's obsession with rare herbs, my devotion to you is deep, incurable, and my favorite mystery in every realm.\"",
   "\"You are the brilliant Maomao to my Jinshi: impossibly clever, naturally gorgeous, and the only soul in the Imperial Court who holds total power over me.\"",
   "\"If your love were a lethal poison, Lady Leslye, I would gladly drink three flagons without ever asking for an antidote.\"",
   "\"Official Imperial Decree from Sir Chif3n: Let no mortal troubles distress my Queen. Your demigod protector stands guard at your side forever.\"",
   "\"No concubine in the Jade, Crystal, Garnet, or Diamond Pavilions could ever compare to your grace, wit, and beauty.\"",
-  "\"Your smile is the purest medicine, curing any heavy heart with a single glance.\"",
-  "\"Even in a court full of palace intrigue, my only goal is making sure my girl Leslye is smiling, safe, and snacking happily.\""
+  "\"Your smile is the purest medicine, curing any heavy heart with a single glance.\""
+];
+
+export const DEMIGOD_POEMS_AND_VOWS = [
+  {
+    title: "The Moonlight Apothecary",
+    verse: "Above the court of shadows and jade,\nWhere whispers vanish and lanterns fade,\nI found a flower more rare than dawn,\nA queen whose beauty outshines the sun.\nFor her, a sanctuary carved in gold,\nWhere stories bloom and love unfolds.",
+    dedication: "For my Empress Leslye"
+  },
+  {
+    title: "The Incurable Antidote",
+    verse: "They search through tomes for cures unseen,\nThrough lotus lakes and forests green.\nYet no physician can explain,\nWhy your sweet whisper ends all pain.\nIf loving you is fevered grace,\nLet eternity be my resting place.",
+    dedication: "Sealed with Sir Chif3n's Demigod Vow"
+  },
+  {
+    title: "Beyond All Mortal Realms",
+    verse: "Ten thousand worlds across the sky,\nWhere stars ignite and comets fly.\nIn every timeline, every book,\nI would cross oceans for your look.\nMy realm is yours, my sacred sword,\nForever bound to my heart’s true lord.",
+    dedication: "From your devoted boyfriend"
+  }
+];
+
+export const CURATED_LIGHT_NOVELS: LightNovelItem[] = [
+  {
+    id: 'ln-1',
+    title: 'The Apothecary Diaries (Light Novel)',
+    coverUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=400',
+    synopsis: 'Maomao, an apothecary girl from the pleasure district, navigates palace conspiracies with wit and poison expertise while captivating Jinshi.',
+    author: 'Natsu Hyuuga',
+    status: 'Ongoing · 15 Volumes',
+    chif3nNote: 'Sir Chif3n says: "The original source of all the royal drama and romance! Unrivaled prose."',
+    novelUpdatesUrl: 'https://www.novelupdates.com/?s=Kusuriya+no+Hitorigoto',
+    sampleChapters: [
+      {
+        chapterNum: 'Vol 1 · Prologue',
+        title: 'The Girl with the Freckles',
+        content: 'Maomao’s fingers were stained purple with dried belladonna extract. In the pleasure district, poisons and cosmetics shared the same delicate shelf. When the imperial guards swept through the market, they knew nothing of the girl who counted medicinal herbs in her sleep, nor the court intrigues that would soon tremble before her sharp eyes...'
+      },
+      {
+        chapterNum: 'Vol 1 · Chapter 1',
+        title: 'Powder and Powdered Jade',
+        content: 'The air in the rear palace tasted of scented sandalwood and stifled ambition. Two imperial babies were failing, their mothers blaming evil spirits. But Maomao smelled something else: the deadly white face powder applied to their soft cheeks. It took only one discreet scrap of cloth left by a window to begin her legend...'
+      }
+    ]
+  },
+  {
+    id: 'ln-2',
+    title: "Frieren: Beyond Journey's End (Novel Archive)",
+    coverUrl: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=400',
+    synopsis: 'The pilgrimage of the elven mage Frieren following the hero Himmel’s passing. Reflections on eternity, fleeting mortal affection, and magic.',
+    author: 'Kanehito Yamada',
+    status: 'Completed / Side Stories',
+    chif3nNote: 'Sir Chif3n says: "Deeply philosophical and heart-wrenching. Read in bed with candles lit."',
+    novelUpdatesUrl: 'https://www.novelupdates.com/?s=Sousou+no+Frieren',
+    sampleChapters: [
+      {
+        chapterNum: 'Chapter 1',
+        title: 'Himmel’s Warmth',
+        content: 'Humans live such brief, blazing lives. Frieren looked down at the copper ring shaped like a lotus blossom. Himmel had placed it on her finger with a smile that would linger long after empires crumbled. It wasn’t until fifty winters had passed that she finally wept...'
+      }
+    ]
+  },
+  {
+    id: 'ln-3',
+    title: 'Ascendance of a Bookworm',
+    coverUrl: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=400',
+    synopsis: 'A book lover reincarnates as a sickly girl in a medieval world where books are only for nobility. She resolves to invent paper, ink, and her own library.',
+    author: 'Miya Kazuki',
+    status: 'Completed · 33 Volumes',
+    chif3nNote: 'Sir Chif3n says: "Intricate world-building, clever inventions, and immense cozy satisfaction."',
+    novelUpdatesUrl: 'https://www.novelupdates.com/?s=Ascendance+of+a+Bookworm',
+    sampleChapters: [
+      {
+        chapterNum: 'Chapter 1',
+        title: 'A World Without Books',
+        content: 'Urano Motosu loved paper smell more than anything. Waking up in the body of little Myne, surrounded by wooden spoons and no books in sight, was her greatest nightmare. If there are no books, she whispered with clenched fists, then I will simply have to make them myself...'
+      }
+    ]
+  },
+  {
+    id: 'ln-4',
+    title: 'Solo Leveling: Ragnarok',
+    coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&q=80&w=400',
+    synopsis: 'The continuation of the Monarch of Shadows saga. Divine battles across celestial gates to protect the human dimension.',
+    author: 'Chugong / Daul',
+    status: 'Ongoing',
+    chif3nNote: 'Sir Chif3n says: "High-octane demigod thrill. Shadow soldiers marching under your banner."',
+    novelUpdatesUrl: 'https://www.novelupdates.com/?s=Solo+Leveling',
+    sampleChapters: [
+      {
+        chapterNum: 'Chapter 1',
+        title: 'Awakening of the Monarch',
+        content: 'The skies over the double dungeon turned pitch black as the shadows answered a single divine command: "Arise." What followed was not a battle, but a coronation...'
+      }
+    ]
+  }
 ];
 
 export const APOTHECARY_PRESCRIPTIONS: ApothecaryPrescription[] = [

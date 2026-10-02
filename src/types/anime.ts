@@ -91,3 +91,41 @@ export interface DailyWatchActivity {
   fullDate: string;
   episodes: number;
 }
+
+export interface MangaItem {
+  id: string;
+  title: string;
+  altTitle?: string;
+  coverUrl: string;
+  description: string;
+  status: string;
+  year?: number;
+  tags: string[];
+  chif3nNote?: string;
+}
+
+export interface MangaChapter {
+  id: string;
+  chapter: string;
+  title: string;
+  volume?: string;
+  publishAt: string;
+  pages?: number;
+}
+
+export interface LightNovelItem {
+  id: string;
+  title: string;
+  coverUrl: string;
+  synopsis: string;
+  author: string;
+  status: string;
+  chif3nNote?: string;
+  novelUpdatesUrl?: string;
+  readLightNovelUrl?: string;
+  sampleChapters?: {
+    chapterNum: string;
+    title: string;
+    content: string;
+  }[];
+}
