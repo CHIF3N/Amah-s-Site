@@ -1,0 +1,6 @@
+{
+  "name": "Leslye's Realm - Anime Sanctuary by Sir Chif3n",
+  "description": "A bespoke anime streaming sanctuary crafted with demigod devotion for Leslye by her boyfriend Sir Chif3n, featuring seamless playback, curated watchlists, and date night queues.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
