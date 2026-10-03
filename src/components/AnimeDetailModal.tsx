@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Play, Heart, Star, Film, Sparkles, Calendar, BookOpen, Leaf } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Play, Heart, Star, Film, Sparkles, Calendar, BookOpen, Leaf, Mic2, Users } from 'lucide-react';
 import { AnimeItem } from '../types/anime';
 
 interface AnimeDetailModalProps {
@@ -17,12 +17,50 @@ export const AnimeDetailModal: React.FC<AnimeDetailModalProps> = ({
   isDateNightSaved,
   onToggleDateNight,
 }) => {
+  const [showFullSynopsis, setShowFullSynopsis] = useState<boolean>(false);
+
   if (!anime) return null;
 
   const poster = anime.images?.webp?.large_image_url || anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url;
 
+  // Curated voice actor mappings for top shows
+  const voiceCast: Record<string, Array<{ role: string; actor: string; romaji: string }>> = {
+    'The Apothecary Diaries': [
+      { role: 'Maomao (猫猫)', actor: 'Aoi Yuuki', romaji: '悠木 碧' },
+      { role: 'Jinshi (壬氏)', actor: 'Takeo Otsuka', romaji: '大塚 剛央' },
+      { role: 'Gaoshun (高順)', actor: 'Katsuyuki Konishi', romaji: '小西 克幸' },
+      { role: 'Lady Gyokuyou (玉葉妃)', actor: 'Atsumi Tanezaki', romaji: '種﨑 敦美' }
+    ],
+    "Frieren: Beyond Journey's End": [
+      { role: 'Frieren (フリーレン)', actor: 'Atsumi Tanezaki', romaji: '種﨑 敦美' },
+      { role: 'Fern (フェルン)', actor: 'Kana Ichinose', romaji: '市ノ瀬 加那' },
+      { role: 'Stark (シュタルク)', actor: 'Chiaki Kobayashi', romaji: '小林 千晃' },
+      { role: 'Himmel (ヒンメル)', actor: 'Nobuhiko Okamoto', romaji: '岡本 信彦' }
+    ],
+    'Dan Da Dan': [
+      { role: 'Momo Ayase (綾瀬桃)', actor: 'Shion Wakayama', romaji: '若山 詩音' },
+      { role: 'Ken "Okarun" Takakura', actor: 'Natsuki Hanae', romaji: '花江 夏樹' },
+      { role: 'Turbo Granny (ターボババア)', actor: 'Mayumi Tanaka', romaji: '田中 真弓' }
+    ],
+    'Solo Leveling': [
+      { role: 'Sung Jinwoo (水篠旬)', actor: 'Taito Ban', romaji: '坂 泰斗' },
+      { role: 'Cha Hae-In (向坂雫)', actor: 'Reina Ueda', romaji: '上田 麗奈' },
+      { role: 'Go Gunhee (後藤清臣)', actor: 'Banjou Ginga', romaji: '銀河 万丈' }
+    ]
+  };
+
+  const defaultCast = [
+    { role: 'Lead Protagonist', actor: 'Elite Cast Ensemble', romaji: '主演声優' },
+    { role: 'Supporting Companion', actor: 'Acclaimed Voice Artist', romaji: '助演声優' }
+  ];
+
+  const matchedCast = Object.entries(voiceCast).find(([title]) =>
+    anime.title?.toLowerCase().includes(title.toLowerCase()) ||
+    (anime.title_english && anime.title_english.toLowerCase().includes(title.toLowerCase()))
+  )?.[1] || defaultCast;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
       <div
         className="relative w-full max-w-2xl bg-[#06150f] border border-emerald-500/40 rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -58,9 +96,9 @@ export const AnimeDetailModal: React.FC<AnimeDetailModalProps> = ({
                 {anime.title_english || anime.title}
               </h2>
               {anime.title_japanese && (
-                <p className="text-xs text-emerald-300/70 mt-0.5 truncate">{anime.title_japanese}</p>
+                <p className="text-xs text-emerald-300 font-serif mt-0.5 truncate">{anime.title_japanese}</p>
               )}
-              {/* Unboxed Metadata (Zero pills) */}
+              {/* Unboxed Metadata */}
               <div className="flex items-center gap-2 text-xs text-emerald-200/90 mt-2">
                 {anime.score && (
                   <span className="flex items-center gap-1 text-amber-300 font-semibold">
@@ -84,7 +122,7 @@ export const AnimeDetailModal: React.FC<AnimeDetailModalProps> = ({
         </div>
 
         {/* Modal Scrollable Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 scrollbar-thin">
           {/* Demigod Dedication Note */}
           {anime.chif3nNote && (
             <div className="p-3.5 rounded-xl bg-gradient-to-r from-emerald-950/60 via-[#072418] to-teal-950/60 border border-emerald-500/40 flex items-start gap-3">
@@ -106,9 +144,39 @@ export const AnimeDetailModal: React.FC<AnimeDetailModalProps> = ({
               <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
               <span>Imperial Case Overview</span>
             </h4>
-            <p className="text-sm text-emerald-100/90 leading-relaxed">
+            <p className={`text-sm text-emerald-100/90 leading-relaxed ${showFullSynopsis ? '' : 'line-clamp-3'}`}>
               {anime.synopsis || 'No synopsis recorded in the imperial scrolls.'}
             </p>
+            {anime.synopsis && anime.synopsis.length > 200 && (
+              <button
+                onClick={() => setShowFullSynopsis(!showFullSynopsis)}
+                className="text-xs text-amber-300 hover:underline mt-1 font-mono"
+              >
+                {showFullSynopsis ? 'Show Less ↑' : 'Read Full Overview ↓'}
+              </button>
+            )}
+          </div>
+
+          {/* Japanese Voice Actor Roster (Reference Style) */}
+          <div>
+            <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Mic2 className="w-3.5 h-3.5 text-amber-400" />
+              <span>Voice Cast & Seiyuu Roster (キャスト)</span>
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {matchedCast.map((c, idx) => (
+                <div
+                  key={idx}
+                  className="p-2.5 rounded-xl bg-[#04120a] border border-emerald-900/70 flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <span className="text-white font-medium block font-cinzel">{c.role}</span>
+                    <span className="text-[10px] text-emerald-400/80 font-serif">{c.romaji}</span>
+                  </div>
+                  <span className="text-amber-300 font-mono text-[11px] font-semibold">{c.actor}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Details Grid */}
@@ -145,11 +213,11 @@ export const AnimeDetailModal: React.FC<AnimeDetailModalProps> = ({
               }}
               className={`px-4 py-2 rounded-xl text-xs font-medium border transition-colors flex items-center gap-2 ${
                 isDateNightSaved
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                   : 'bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-200 border-emerald-800'
               }`}
             >
-              <Heart className={`w-3.5 h-3.5 ${isDateNightSaved ? 'fill-emerald-400 text-emerald-400' : ''}`} />
+              <Heart className={`w-3.5 h-3.5 ${isDateNightSaved ? 'fill-rose-400 text-rose-400' : ''}`} />
               <span>{isDateNightSaved ? 'Saved in Date Night' : 'Add to Date Night'}</span>
             </button>
 

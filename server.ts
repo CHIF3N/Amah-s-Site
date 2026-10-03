@@ -1,6 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
 import path from 'path';
+import http from 'http';
 import { fileURLToPath } from 'url';
+import { WebSocketServer, WebSocket } from 'ws';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,6 +11,53 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// -------------------------------------------------------------
+// Real-time Love Scrolls / Live Chatbox In-Memory Store
+// -------------------------------------------------------------
+export interface LiveLoveScroll {
+  id: string;
+  sender: string;
+  senderRole: 'chif3n' | 'leslye' | 'demigod';
+  text: string;
+  timestamp: number;
+}
+
+const liveLoveScrolls: LiveLoveScroll[] = [
+  {
+    id: 'scroll-initial-1',
+    sender: 'Sir Chif3n (Demigod) 👑',
+    senderRole: 'chif3n',
+    text: "Welcome to your royal sanctuary, my sweet Leslye! Every single frame and scroll in this realm was built for your comfort and joy. 🌿❤️",
+    timestamp: Date.now() - 1000 * 60 * 60 * 4
+  },
+  {
+    id: 'scroll-initial-2',
+    sender: 'Sir Chif3n (Demigod) 👑',
+    senderRole: 'chif3n',
+    text: "Ready for our next Date Night stream? I've got your favorite blanket and snacks waiting! ✨",
+    timestamp: Date.now() - 1000 * 60 * 60 * 2
+  },
+  {
+    id: 'scroll-initial-3',
+    sender: 'Lady Leslye (Maomao) 🌿',
+    senderRole: 'leslye',
+    text: "Thank you for creating this magical realm for me, Sir Chif3n! You are the best boyfriend in the entire world 💚",
+    timestamp: Date.now() - 1000 * 60 * 30
+  }
+];
+
+// Active WebSocket clients set
+const connectedClients = new Set<WebSocket>();
+
+function broadcastScroll(message: LiveLoveScroll) {
+  const payload = JSON.stringify({ type: 'new_message', message });
+  for (const client of connectedClients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(payload);
+    }
+  }
+}
 
 // Enable CORS
 app.use((req, res, next) => {
@@ -310,6 +359,55 @@ app.get('/api/anime/search', async (req: Request, res: Response) => {
 // -------------------------------------------------------------
 // 4. Stream Source Resolver: Connects to free streaming repos
 // -------------------------------------------------------------
+app.get('/api/anime/:id/episode/:ep/embed', (req: Request, res: Response) => {
+  const { id, ep } = req.params;
+  const episode = parseInt(ep, 10) || 1;
+
+  if (!id) {
+    return res.status(400).json({ success: false, message: 'Missing anime id' });
+  }
+
+  const sources = [
+    {
+      vial: 'Vial I',
+      serverName: 'VidSrc CC (Primary)',
+      embedUrl: `https://vidsrc.cc/v2/embed/anime/${id}/${episode}`,
+      quality: '1080p Ultra HD',
+      isDefault: true
+    },
+    {
+      vial: 'Vial II',
+      serverName: 'Embed SU (Mirror A)',
+      embedUrl: `https://embed.su/embed/anime/${id}/${episode}`,
+      quality: '1080p High Speed',
+      isDefault: false
+    },
+    {
+      vial: 'Vial III',
+      serverName: 'VidSrc Me (Mirror B)',
+      embedUrl: `https://vidsrc.me/embed/anime?id=${id}&ep=${episode}`,
+      quality: '720p/1080p Fast',
+      isDefault: false
+    },
+    {
+      vial: 'Vial IV',
+      serverName: '2Embed (Direct)',
+      embedUrl: `https://2embed.cc/embed/${id}`,
+      quality: 'Direct Stream',
+      isDefault: false
+    }
+  ];
+
+  res.json({
+    success: true,
+    animeId: id,
+    episode,
+    primaryEmbed: sources[0].embedUrl,
+    sources,
+    cdn: 'Leslye Stream CDN - 1080p Ultra HD (60 FPS)'
+  });
+});
+
 app.get('/api/anime/sources', (req: Request, res: Response) => {
   const malId = req.query.malId as string;
   const episode = parseInt(req.query.episode as string) || 1;
@@ -405,9 +503,94 @@ app.get('/api/proxy', async (req: Request, res: Response) => {
 });
 
 // -------------------------------------------------------------
-// 6. Vite Mounting in Dev / Static Serving in Prod
+// 6. Real-time Love Scrolls API Endpoints
+// -------------------------------------------------------------
+app.get('/api/scrolls', (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    messages: liveLoveScrolls
+  });
+});
+
+app.post('/api/scrolls', (req: Request, res: Response) => {
+  const { sender, senderRole, text } = req.body;
+  if (!text || !text.trim()) {
+    return res.status(400).json({ success: false, message: 'Message text cannot be empty' });
+  }
+
+  const newScroll: LiveLoveScroll = {
+    id: `scroll-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    sender: sender?.trim() || 'Sir Chif3n (Demigod) 👑',
+    senderRole: senderRole || 'chif3n',
+    text: text.trim(),
+    timestamp: Date.now()
+  };
+
+  liveLoveScrolls.push(newScroll);
+  if (liveLoveScrolls.length > 200) {
+    liveLoveScrolls.shift();
+  }
+
+  // Broadcast to all active WebSocket clients in real time
+  broadcastScroll(newScroll);
+
+  res.json({
+    success: true,
+    message: newScroll
+  });
+});
+
+// -------------------------------------------------------------
+// 7. Vite Mounting in Dev / Static Serving in Prod with WebSockets
 // -------------------------------------------------------------
 async function startServer() {
+  const server = http.createServer(app);
+
+  // Initialize WebSocket server attached to the HTTP server
+  const wss = new WebSocketServer({ server });
+
+  wss.on('connection', (ws: WebSocket) => {
+    connectedClients.add(ws);
+
+    // Send existing love scrolls history immediately upon connect
+    ws.send(JSON.stringify({
+      type: 'init',
+      messages: liveLoveScrolls
+    }));
+
+    ws.on('message', (data: any) => {
+      try {
+        const parsed = JSON.parse(data.toString());
+        if (parsed.type === 'send_message' && parsed.text && parsed.text.trim()) {
+          const newScroll: LiveLoveScroll = {
+            id: `scroll-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            sender: parsed.sender?.trim() || 'Sir Chif3n (Demigod) 👑',
+            senderRole: parsed.senderRole || 'chif3n',
+            text: parsed.text.trim(),
+            timestamp: Date.now()
+          };
+
+          liveLoveScrolls.push(newScroll);
+          if (liveLoveScrolls.length > 200) {
+            liveLoveScrolls.shift();
+          }
+
+          broadcastScroll(newScroll);
+        }
+      } catch (e) {
+        console.error('WebSocket message parsing error:', e);
+      }
+    });
+
+    ws.on('close', () => {
+      connectedClients.delete(ws);
+    });
+
+    ws.on('error', () => {
+      connectedClients.delete(ws);
+    });
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     // Dynamic import vite in dev
     const { createServer: createViteServer } = await import('vite');
@@ -427,8 +610,9 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, () => {
+  server.listen(PORT, () => {
     console.log(`[Demigod Backend] Server running at http://localhost:${PORT}`);
+    console.log(`[WebSocket Server] Live Real-time Love Scrolls attached on port ${PORT}`);
     console.log(`[Connected Repos] AniList GraphQL, Jikan MAL v4, VidSrc, 2Embed, VidLink active`);
   });
 }

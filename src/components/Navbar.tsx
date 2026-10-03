@@ -1,9 +1,24 @@
 import React, { useState } from 'react';
-import { Sparkles, Heart, Menu, X, Leaf, BookOpen, Feather } from 'lucide-react';
+import {
+  Sparkles,
+  Heart,
+  Menu,
+  X,
+  Leaf,
+  Radio,
+  Dice5,
+  Calendar,
+  BookOpen,
+  Feather,
+  Crown
+} from 'lucide-react';
 
 interface NavbarProps {
-  activeTab: 'browse' | 'manga' | 'novels' | 'demigod-picks' | 'date-night' | 'love-scrolls';
-  onSelectTab: (tab: 'browse' | 'manga' | 'novels' | 'demigod-picks' | 'date-night' | 'love-scrolls') => void;
+  activeTab: 'browse' | 'airing' | 'manga' | 'novels' | 'demigod-picks' | 'date-night' | 'love-scrolls';
+  onSelectTab: (tab: 'browse' | 'airing' | 'manga' | 'novels' | 'demigod-picks' | 'date-night' | 'love-scrolls') => void;
+  onOpenSchedule: () => void;
+  onOpenGacha: () => void;
+  onOpenRadio: () => void;
   onOpenPoetry: () => void;
   ambientMode: 'stars' | 'sakura' | 'off';
   onToggleAmbient: () => void;
@@ -13,6 +28,9 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   onSelectTab,
+  onOpenSchedule,
+  onOpenGacha,
+  onOpenRadio,
   onOpenPoetry,
   ambientMode,
   onToggleAmbient,
@@ -21,122 +39,130 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 bg-[#040e0a]/92 backdrop-blur-md border-b border-emerald-900/60 px-3 sm:px-6 lg:px-8 py-2.5 transition-colors">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+    <header className="sticky top-0 z-40 bg-[#040e0a]/95 backdrop-blur-md border-b border-emerald-900/60 px-3 sm:px-6 lg:px-8 py-2.5 transition-colors">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         
-        {/* Brand Wordmark */}
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            onSelectTab('browse');
-          }}
-          className="font-cinzel text-base sm:text-lg font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-amber-300 hover:opacity-90 transition-opacity flex items-center gap-1.5 select-none"
-        >
-          <Leaf className="w-4 h-4 text-emerald-400 inline" />
-          <span>LESLYE'S REALM</span>
-        </a>
-
-        {/* Desktop Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-7 text-xs sm:text-sm font-medium text-emerald-100/80">
-          <button
-            onClick={() => onSelectTab('browse')}
-            className={`transition-colors relative py-1 hover:text-white ${
-              activeTab === 'browse'
-                ? 'text-white font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-emerald-400'
-                : 'text-emerald-300/70'
-            }`}
+        {/* Brand Header with Japanese Sub-label & Demigod's Sanctuary badge */}
+        <div className="flex items-center gap-3">
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              onSelectTab('browse');
+            }}
+            className="flex items-center gap-2 group select-none"
           >
-            🌿 Anime
-          </button>
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-600 to-amber-500 p-[1.5px] shadow-md shadow-emerald-950/60">
+              <div className="w-full h-full bg-[#04110a] rounded-[10px] flex items-center justify-center">
+                <Leaf className="w-4 h-4 text-emerald-400 group-hover:rotate-12 transition-transform" />
+              </div>
+            </div>
 
-          <button
-            onClick={() => onSelectTab('manga')}
-            className={`transition-colors relative py-1 hover:text-white ${
-              activeTab === 'manga'
-                ? 'text-white font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-emerald-400'
-                : 'text-emerald-300/70'
-            }`}
-          >
-            📜 Manga
-          </button>
-
-          <button
-            onClick={() => onSelectTab('novels')}
-            className={`transition-colors relative py-1 hover:text-white ${
-              activeTab === 'novels'
-                ? 'text-white font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-emerald-400'
-                : 'text-emerald-300/70'
-            }`}
-          >
-            📖 Novels
-          </button>
-
-          <button
-            onClick={() => onSelectTab('demigod-picks')}
-            className={`transition-colors relative py-1 hover:text-white ${
-              activeTab === 'demigod-picks'
-                ? 'text-white font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-amber-400'
-                : 'text-emerald-300/70'
-            }`}
-          >
-            👑 Demigod's Picks
-          </button>
-
-          <button
-            onClick={() => onSelectTab('date-night')}
-            className={`transition-colors relative py-1 hover:text-white flex items-center gap-1.5 ${
-              activeTab === 'date-night'
-                ? 'text-white font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-rose-400'
-                : 'text-emerald-300/70'
-            }`}
-          >
-            <span>Date Night</span>
-            {dateNightCount > 0 && (
-              <span className="text-[11px] font-mono text-amber-300 tabular-nums">
-                ({dateNightCount})
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-cinzel text-base sm:text-lg font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-emerald-200 via-white to-amber-300">
+                  LESLYE'S REALM
+                </span>
+                <span className="hidden sm:inline-block px-2 py-0.5 rounded-full text-[9px] font-bold font-mono uppercase tracking-wider bg-gradient-to-r from-rose-950/80 to-amber-950/80 text-rose-300 border border-rose-500/40 shadow-sm">
+                  Demigod's Sanctuary ❤️
+                </span>
+              </div>
+              <span className="text-[10px] font-serif text-emerald-400/80 tracking-widest block -mt-0.5">
+                宮廷の薬草聖域 (Imperial Herbal Sanctuary)
               </span>
-            )}
-          </button>
+            </div>
+          </a>
+        </div>
 
+        {/* Desktop Quick Triggers & Navigation */}
+        <div className="hidden lg:flex items-center gap-2">
+          {/* Schedule Trigger */}
           <button
-            onClick={() => onSelectTab('love-scrolls')}
-            className={`transition-colors relative py-1 hover:text-white ${
-              activeTab === 'love-scrolls'
-                ? 'text-white font-semibold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[2px] after:bg-emerald-400'
-                : 'text-emerald-300/70'
-            }`}
+            onClick={onOpenSchedule}
+            className="px-3 py-1.5 rounded-xl bg-[#04140e] border border-emerald-800/80 hover:border-emerald-500 text-xs text-emerald-200 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
           >
-            Love Scrolls
+            <Calendar className="w-3.5 h-3.5 text-amber-400" />
+            <span>Schedule</span>
           </button>
-        </nav>
 
-        {/* Primary Actions */}
-        <div className="flex items-center gap-2">
-          {/* Demigod Poetry Modal Trigger */}
+          {/* Gacha Altar Trigger */}
+          <button
+            onClick={onOpenGacha}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-emerald-500/20 border border-amber-500/40 hover:border-amber-400 text-xs text-amber-300 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
+          >
+            <Dice5 className="w-3.5 h-3.5 text-amber-400" />
+            <span>Gacha Altar</span>
+          </button>
+
+          {/* Lo-Fi Radio Trigger */}
+          <button
+            onClick={onOpenRadio}
+            className="px-3 py-1.5 rounded-xl bg-[#04140e] border border-emerald-800/80 hover:border-emerald-500 text-xs text-emerald-200 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
+          >
+            <Radio className="w-3.5 h-3.5 text-emerald-400" />
+            <span>OST Lo-Fi</span>
+          </button>
+
+          {/* Vows & Poetry Modal Trigger */}
           <button
             onClick={onOpenPoetry}
-            className="px-2.5 sm:px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 text-xs font-medium transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-medium transition-colors flex items-center gap-1.5"
             title="Read Sir Chif3n's Vows and Poems"
           >
-            <Feather className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">Vows & Poetry</span>
+            <Feather className="w-3.5 h-3.5 text-rose-400" />
+            <span>Vows & Poetry</span>
+          </button>
+
+          {/* Date Night Pill */}
+          <button
+            onClick={() => onSelectTab('date-night')}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+              activeTab === 'date-night'
+                ? 'bg-rose-600 text-white border-rose-400'
+                : 'bg-[#03110b] text-rose-300 border-rose-900/60 hover:border-rose-500'
+            }`}
+          >
+            <Heart className={`w-3.5 h-3.5 ${dateNightCount > 0 ? 'fill-rose-400' : ''}`} />
+            <span>Date Night</span>
+            {dateNightCount > 0 && (
+              <span className="text-[10px] font-mono bg-rose-950 px-1.5 py-0.2 rounded text-amber-300">
+                {dateNightCount}
+              </span>
+            )}
           </button>
 
           {/* Ambience Switcher */}
           <button
             onClick={onToggleAmbient}
             title={`Ambience effect: currently ${ambientMode}`}
-            className="p-1.5 sm:p-2 rounded-lg border border-emerald-900/60 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-200 transition-colors flex items-center gap-1 text-xs"
+            className="p-1.5 rounded-xl border border-emerald-900/60 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-200 transition-colors flex items-center gap-1 text-xs"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden md:inline capitalize">{ambientMode}</span>
+            <span className="capitalize">{ambientMode}</span>
+          </button>
+        </div>
+
+        {/* Mobile menu trigger */}
+        <div className="flex items-center gap-2 lg:hidden">
+          <button
+            onClick={onOpenRadio}
+            className="p-2 rounded-xl bg-[#04140e] border border-emerald-800 text-emerald-300"
+            title="Open Lo-Fi Radio"
+          >
+            <Radio className="w-4 h-4 text-emerald-400" />
           </button>
 
-          {/* Mobile drawer toggle */}
+          <button
+            onClick={onOpenGacha}
+            className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-300"
+            title="Open Gacha Altar"
+          >
+            <Dice5 className="w-4 h-4" />
+          </button>
+
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-1.5 rounded-lg text-emerald-300 hover:text-white hover:bg-emerald-900/60"
+            className="p-2 rounded-xl text-emerald-300 hover:text-white bg-emerald-950/80 border border-emerald-900"
             aria-label="Toggle navigation menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -147,16 +173,40 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="lg:hidden pt-3 pb-2 border-t border-emerald-900/60 mt-2 space-y-1.5 animate-in fade-in slide-in-from-top-2">
+          <div className="grid grid-cols-2 gap-2 pb-2">
+            <button
+              onClick={() => {
+                onOpenSchedule();
+                setMobileMenuOpen(false);
+              }}
+              className="p-2.5 rounded-xl bg-[#061710] border border-emerald-800 text-xs text-emerald-200 flex items-center gap-2"
+            >
+              <Calendar className="w-4 h-4 text-amber-400" />
+              <span>Broadcast Schedule</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onOpenGacha();
+                setMobileMenuOpen(false);
+              }}
+              className="p-2.5 rounded-xl bg-[#061710] border border-amber-500/40 text-xs text-amber-300 flex items-center gap-2"
+            >
+              <Dice5 className="w-4 h-4 text-amber-400" />
+              <span>Gacha Altar</span>
+            </button>
+          </div>
+
           <button
             onClick={() => {
               onSelectTab('browse');
               setMobileMenuOpen(false);
             }}
-            className={`w-full text-left px-3 py-2 rounded text-xs sm:text-sm ${
+            className={`w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm ${
               activeTab === 'browse' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
             }`}
           >
-            🌿 Anime Streaming
+            🌿 Realm Home
           </button>
 
           <button
@@ -164,11 +214,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               onSelectTab('manga');
               setMobileMenuOpen(false);
             }}
-            className={`w-full text-left px-3 py-2 rounded text-xs sm:text-sm ${
+            className={`w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm ${
               activeTab === 'manga' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
             }`}
           >
-            📜 Manga (MangaDex)
+            📜 Manga Scrolls (MangaDex)
           </button>
 
           <button
@@ -176,11 +226,11 @@ export const Navbar: React.FC<NavbarProps> = ({
               onSelectTab('novels');
               setMobileMenuOpen(false);
             }}
-            className={`w-full text-left px-3 py-2 rounded text-xs sm:text-sm ${
+            className={`w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm ${
               activeTab === 'novels' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
             }`}
           >
-            📖 Light Novels
+            📖 Imperial Tomes (Novels)
           </button>
 
           <button
@@ -188,7 +238,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               onSelectTab('demigod-picks');
               setMobileMenuOpen(false);
             }}
-            className={`w-full text-left px-3 py-2 rounded text-xs sm:text-sm ${
+            className={`w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm ${
               activeTab === 'demigod-picks' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
             }`}
           >
@@ -200,8 +250,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onSelectTab('date-night');
               setMobileMenuOpen(false);
             }}
-            className={`w-full text-left px-3 py-2 rounded text-xs sm:text-sm flex items-center justify-between ${
-              activeTab === 'date-night' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
+            className={`w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm flex items-center justify-between ${
+              activeTab === 'date-night' ? 'bg-rose-900/60 text-white font-medium' : 'text-rose-300/80'
             }`}
           >
             <span>Date Night Watchlist</span>
@@ -214,14 +264,12 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           <button
             onClick={() => {
-              onSelectTab('love-scrolls');
+              onOpenPoetry();
               setMobileMenuOpen(false);
             }}
-            className={`w-full text-left px-3 py-2 rounded text-xs sm:text-sm ${
-              activeTab === 'love-scrolls' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
-            }`}
+            className="w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm text-amber-300 hover:text-white"
           >
-            Love Scrolls & Decrees
+            ✨ Demigod's Vows & Poetry
           </button>
         </div>
       )}

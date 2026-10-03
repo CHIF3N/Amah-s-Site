@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Scroll, Heart, Sparkles, Send, ShieldCheck, Crown, Leaf, FlaskConical, Quote } from 'lucide-react';
+import { Scroll, Heart, Sparkles, Send, ShieldCheck, Crown, Leaf, FlaskConical, Quote, MessageCircle } from 'lucide-react';
 import { DemigodScroll } from '../types/anime';
 import { MAOMAO_STATEMENTS_FOR_LESLYE } from '../data/curatedData';
+import { LiveLoveScrollChatbox } from './LiveLoveScrollChatbox';
 
 interface DemigodLoveScrollsProps {
   scrolls: DemigodScroll[];
@@ -90,6 +91,26 @@ export const DemigodLoveScrolls: React.FC<DemigodLoveScrollsProps> = ({
         </div>
       </div>
 
+      {/* Real-time Live Love Scroll Chatbox (Synced in Real Time across all devices) */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="w-4 h-4 text-amber-400" />
+            <h3 className="font-cinzel text-base font-bold text-white">
+              Live Real-Time Love Scrolls (Instant Messaging)
+            </h3>
+          </div>
+          <span className="text-xs text-emerald-400 font-mono">
+            ● Real-Time WebSocket Link Active
+          </span>
+        </div>
+        <p className="text-xs text-emerald-300/80">
+          Messages sent here appear instantaneously on both Sir Chif3n's and Lady Leslye's screens in real time.
+        </p>
+
+        <LiveLoveScrollChatbox />
+      </section>
+
       {/* The Consecrated Scrolls Grid */}
       <div>
         <h3 className="text-base font-semibold text-emerald-100 mb-3 flex items-center gap-2">
@@ -140,53 +161,43 @@ export const DemigodLoveScrolls: React.FC<DemigodLoveScrollsProps> = ({
           </div>
         </div>
 
-        {/* Input box */}
         <form onSubmit={handleSendNote} className="flex gap-2">
           <input
             type="text"
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
-            placeholder="Inscribe a note, an anime request, or a message to Sir Chif3n..."
-            className="flex-1 bg-[#040e0a] border border-emerald-800/80 rounded-xl px-4 py-2.5 text-sm text-white placeholder-emerald-600 focus:outline-none focus:border-emerald-400"
+            placeholder="Inscribe a private herbal thought for Sir Chif3n..."
+            className="flex-1 bg-[#030e08] border border-emerald-800 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-emerald-100 placeholder-emerald-700 focus:outline-none focus:border-amber-400"
           />
           <button
             type="submit"
-            className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-2 transition-colors shrink-0 shadow-sm"
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-amber-600 hover:from-emerald-500 hover:to-amber-500 text-white font-semibold text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 shrink-0"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>Inscribe</span>
+            <span>Save Whisper</span>
           </button>
         </form>
 
-        {/* Notes list */}
-        {leslyeNotes.length > 0 ? (
-          <div className="space-y-2.5 pt-2">
-            {leslyeNotes.map((note) => (
-              <div
-                key={note.id}
-                className="p-3.5 rounded-xl bg-[#040f0b] border border-emerald-900/80 flex items-start justify-between gap-3 text-xs"
-              >
-                <div className="min-w-0">
-                  <p className="text-emerald-100 text-sm">{note.text}</p>
-                  <span className="text-[10px] text-emerald-500 mt-1 block">
-                    Inscribed on {note.date}
-                  </span>
-                </div>
-                <button
-                  onClick={() => onDeleteLeslyeNote(note.id)}
-                  className="text-emerald-600 hover:text-rose-400 p-1 transition-colors"
-                  title="Remove note"
-                >
-                  &times;
-                </button>
+        <div className="space-y-2 pt-2">
+          {leslyeNotes.map((note) => (
+            <div
+              key={note.id}
+              className="p-3.5 rounded-xl bg-[#04120a] border border-emerald-900/70 flex items-center justify-between text-xs"
+            >
+              <div className="min-w-0 flex-1 mr-3">
+                <p className="text-emerald-100 italic">"{note.text}"</p>
+                <span className="text-[10px] text-emerald-500 font-mono mt-1 block">{note.date}</span>
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-emerald-500 italic py-2">
-            No herbal notes inscribed yet. Leave your first whisper above, my Queen!
-          </p>
-        )}
+              <button
+                onClick={() => onDeleteLeslyeNote(note.id)}
+                className="text-emerald-600 hover:text-rose-400 text-xs transition-colors shrink-0"
+                title="Delete note"
+              >
+                &times;
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

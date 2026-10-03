@@ -122,6 +122,56 @@ export async function searchMangaDex(query: string): Promise<MangaItem[]> {
   }
 }
 
+// Fetch Latest Updates from MangaDex
+export async function fetchLatestMangaUpdates(): Promise<MangaItem[]> {
+  const cacheKey = 'mangadex_latest_updates';
+  const cached = mangaCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
+  try {
+    const res = await fetch('https://api.mangadex.org/manga?limit=18&order[updatedAt]=desc&includes[]=cover_art&contentRating[]=safe&contentRating[]=suggestive');
+    if (!res.ok) throw new Error(`MangaDex returned ${res.status}`);
+    const json = await res.json();
+    const data = json.data || [];
+
+    const results: MangaItem[] = data.map((item: any) => {
+      const titleObj = item.attributes?.title || {};
+      const title = titleObj.en || Object.values(titleObj)[0] || 'Unknown Manga';
+      const descObj = item.attributes?.description || {};
+      const description = descObj.en || Object.values(descObj)[0] || 'Recently updated on MangaDex.';
+
+      const coverRel = item.relationships?.find((r: any) => r.type === 'cover_art');
+      const fileName = coverRel?.attributes?.fileName;
+      const coverUrl = fileName 
+        ? `https://uploads.mangadex.org/covers/${item.id}/${fileName}.256.jpg`
+        : 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&q=80&w=400';
+
+      const tags = (item.attributes?.tags || []).map((t: any) => t.attributes?.name?.en).filter(Boolean);
+
+      return {
+        id: item.id,
+        title,
+        coverUrl,
+        description: description.replace(/\[\/?\w+.*?\]/g, '').slice(0, 300) + '...',
+        status: item.attributes?.status || 'Ongoing',
+        year: item.attributes?.year,
+        tags: tags.slice(0, 4)
+      };
+    });
+
+    if (results.length > 0) {
+      mangaCache.set(cacheKey, { data: results, timestamp: Date.now() });
+      return results;
+    }
+    return CURATED_MANGA;
+  } catch (err) {
+    console.warn('MangaDex latest updates error, using curated:', err);
+    return CURATED_MANGA;
+  }
+}
+
 // Fetch Chapters for a Manga
 export async function fetchMangaChapters(mangaId: string): Promise<MangaChapter[]> {
   const cacheKey = `mangadex_chapters_${mangaId}`;
