@@ -22,6 +22,8 @@ interface NavbarProps {
   onOpenRadio: () => void;
   onOpenPoetry: () => void;
   onOpenGame?: () => void;
+  onOpenLogin?: () => void;
+  activeRole?: 'chif3n' | 'leslye';
   ambientMode: 'stars' | 'sakura' | 'off';
   onToggleAmbient: () => void;
   dateNightCount: number;
@@ -35,6 +37,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenRadio,
   onOpenPoetry,
   onOpenGame,
+  onOpenLogin,
+  activeRole = 'chif3n',
   ambientMode,
   onToggleAmbient,
   dateNightCount,
@@ -79,6 +83,31 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Desktop Quick Triggers & Navigation */}
         <div className="hidden lg:flex items-center gap-2">
+          {/* Active Persona / Login Switcher */}
+          {onOpenLogin && (
+            <button
+              onClick={onOpenLogin}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
+                activeRole === 'leslye'
+                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60 hover:border-emerald-400'
+                  : 'bg-amber-950/80 text-amber-300 border-amber-500/60 hover:border-amber-400'
+              }`}
+              title="Imperial Profile & Persona Gate"
+            >
+              {activeRole === 'leslye' ? (
+                <>
+                  <Leaf className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Lady Leslye 🌿</span>
+                </>
+              ) : (
+                <>
+                  <Crown className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Sir Chif3n 👑</span>
+                </>
+              )}
+            </button>
+          )}
+
           {/* Couple Game Trigger */}
           {onOpenGame && (
             <button
@@ -204,6 +233,30 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           <div className="grid grid-cols-2 gap-2 pb-2">
+            {onOpenLogin && (
+              <button
+                onClick={() => {
+                  onOpenLogin();
+                  setMobileMenuOpen(false);
+                }}
+                className={`col-span-2 p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between gap-2 shadow-sm ${
+                  activeRole === 'leslye'
+                    ? 'bg-emerald-950 border-emerald-500 text-emerald-200'
+                    : 'bg-amber-950 border-amber-500 text-amber-200'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {activeRole === 'leslye' ? (
+                    <Leaf className="w-4 h-4 text-emerald-400" />
+                  ) : (
+                    <Crown className="w-4 h-4 text-amber-400" />
+                  )}
+                  <span>Persona: {activeRole === 'leslye' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑'}</span>
+                </div>
+                <span className="text-[10px] text-amber-300 underline font-mono">Switch Profile</span>
+              </button>
+            )}
+
             {onOpenGame && (
               <button
                 onClick={() => {

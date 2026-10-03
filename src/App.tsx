@@ -40,6 +40,7 @@ import { BroadcastSchedule } from './components/BroadcastSchedule';
 import { LoFiRadio } from './components/LoFiRadio';
 import { LiveLoveScrollChatbox } from './components/LiveLoveScrollChatbox';
 import { ImperialCoupleGame } from './components/ImperialCoupleGame';
+import { ImperialLoginModal, ImperialRole } from './components/ImperialLoginModal';
 import { WatchActivityChart } from './components/WatchActivityChart';
 import { AmbientCanvas } from './components/AmbientCanvas';
 import { AnimeItem, DateNightItem, WatchHistoryItem, DailyWatchActivity } from './types/anime';
@@ -67,6 +68,14 @@ export default function App() {
   const [radioModalOpen, setRadioModalOpen] = useState(false);
   const [floatingChatOpen, setFloatingChatOpen] = useState(false);
   const [gameModalOpen, setGameModalOpen] = useState(false);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [activeRole, setActiveRole] = useState<ImperialRole>(() => {
+    try {
+      const saved = localStorage.getItem('leslye_active_user');
+      if (saved === 'chif3n' || saved === 'leslye') return saved;
+    } catch (e) {}
+    return 'chif3n';
+  });
 
   // Ambience mode
   const [ambientMode, setAmbientMode] = useState<'stars' | 'sakura' | 'off'>('stars');
@@ -423,6 +432,18 @@ export default function App() {
       <ImperialCoupleGame
         isOpen={gameModalOpen}
         onClose={() => setGameModalOpen(false)}
+        onOpenLoginModal={() => setLoginModalOpen(true)}
+      />
+
+      {/* Imperial Profile & Persona Login Modal */}
+      <ImperialLoginModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+        currentRole={activeRole}
+        onSelectRole={(role) => {
+          setActiveRole(role);
+          showToast(`Logged in as ${role === 'leslye' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑'}`);
+        }}
       />
 
       {/* Top Navbar with Branding */}
@@ -437,6 +458,8 @@ export default function App() {
         onOpenRadio={() => setRadioModalOpen(true)}
         onOpenPoetry={() => setPoetryDrawerOpen(true)}
         onOpenGame={() => setGameModalOpen(true)}
+        onOpenLogin={() => setLoginModalOpen(true)}
+        activeRole={activeRole}
         ambientMode={ambientMode}
         onToggleAmbient={handleToggleAmbient}
         dateNightCount={dateNightItems.length}
@@ -850,6 +873,7 @@ export default function App() {
         isFloating={true}
         isOpen={floatingChatOpen}
         onClose={() => setFloatingChatOpen(false)}
+        onOpenLoginModal={() => setLoginModalOpen(true)}
       />
 
       {/* Floating Chatbox Launcher Button (Bottom Right) */}

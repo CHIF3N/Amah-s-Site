@@ -20,7 +20,10 @@ import {
   Award,
   Layers,
   Check,
-  Flame
+  Flame,
+  RefreshCw,
+  Smartphone,
+  Globe
 } from 'lucide-react';
 
 interface ArcadePresence {
@@ -40,18 +43,20 @@ interface BoardGameState {
   lastMove: { row: number; col: number; player: string } | null;
 }
 
+interface TriviaQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  category: string;
+  difficulty: string;
+  funFact: string;
+}
+
 interface TriviaGameState {
   questionIndex: number;
   totalQuestions: number;
-  currentQuestion: {
-    id: string;
-    question: string;
-    options: string[];
-    correctIndex: number;
-    category: string;
-    difficulty: string;
-    funFact: string;
-  };
+  currentQuestion: TriviaQuestion;
   answers: { chif3n: number | null; leslye: number | null };
   scores: { chif3n: number; leslye: number };
   revealed: boolean;
@@ -86,24 +91,221 @@ interface ArcadeState {
 interface ImperialCoupleGameProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenLoginModal?: () => void;
 }
 
-export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({ isOpen, onClose }) => {
-  const [arcade, setArcade] = useState<ArcadeState | null>(null);
-  const [activeTab, setActiveTab] = useState<'board' | 'trivia' | 'alchemy'>('board');
+const TRIVIA_BANK: TriviaQuestion[] = [
+  {
+    id: 't-1',
+    question: 'In The Apothecary Diaries, what rare physical trait is Maomao famously known for having on her arm?',
+    options: ['A lotus birthmark', 'Scars from deliberate poison testing', 'An imperial jade tattoo', 'A golden dragon burn'],
+    correctIndex: 1,
+    category: 'The Apothecary Diaries',
+    difficulty: 'Imperial Court Hygiene',
+    funFact: 'Maomao tested snake venom, powdered mercury, and various herbs directly on herself to study their effects!'
+  },
+  {
+    id: 't-2',
+    question: "What is Sir Chif3n's primary demigod duty whenever Lady Leslye is watching an intense cliffhanger episode?",
+    options: ['Sample all snacks for poison & give shoulder massages', 'Leave the room silently', 'Pause and spoil the ending', 'Refuse to share popcorn'],
+    correctIndex: 0,
+    category: 'Couple Sacred Laws',
+    difficulty: 'Demigod Protocol',
+    funFact: 'Sacred Decree #001 states Sir Chif3n must ensure 100% boba and blanket readiness at all times.'
+  },
+  {
+    id: 't-3',
+    question: 'What dangerous substance hidden in face powder was poisoning the imperial consorts and their infants?',
+    options: ['Arsenic', 'White Lead', 'Wolfsbane', 'Ground Asbestos'],
+    correctIndex: 1,
+    category: 'The Apothecary Diaries',
+    difficulty: 'Palace Mystery',
+    funFact: 'Lead was commonly used in historical cosmetic powders, causing severe toxicity in imperial nurseries.'
+  },
+  {
+    id: 't-4',
+    question: "In Frieren: Beyond Journey's End, how many years does Frieren's new journey retrace Himmel's hero party quest?",
+    options: ['10 years', '20 years', '50 years', '100 years'],
+    correctIndex: 0,
+    category: 'Frieren Lore',
+    difficulty: 'Heroic Journey',
+    funFact: "The original adventure took exactly 10 years, which Frieren initially considered 'only a mere decade'."
+  },
+  {
+    id: 't-5',
+    question: 'Whenever Jinshi tries to use his heavenly handsome charms on Maomao, how does she usually react?',
+    options: ['She faints from attraction', 'She gazes like inspecting a strange caterpillar or toad', 'She writes a love poem', 'She requests an imperial marriage'],
+    correctIndex: 1,
+    category: 'The Apothecary Diaries',
+    difficulty: 'Rear Palace Comedy',
+    funFact: "Jinshi is so accustomed to everyone falling for him that Maomao's cold deadpan disgust completely fascinates him!"
+  },
+  {
+    id: 't-6',
+    question: 'What sweet herbal ingredient does Maomao often infuse into soothing teas for throat ailments?',
+    options: ['Licorice Root (Gan Cao)', 'Spicy Szechuan Peppercorn', 'Bitter Melon', 'Crushed Pine Needle'],
+    correctIndex: 0,
+    category: 'Herbal Medicine',
+    difficulty: 'Imperial Pharmacology',
+    funFact: 'Licorice root naturally sweetens remedies while harmonizing harsh pharmacological properties of other herbs.'
+  },
+  {
+    id: 't-7',
+    question: 'When Sir Chif3n claims his love for Lady Leslye has zero toxicity, what is the scientific purity percentage?',
+    options: ['99.9%', '100% Pure Celestial Essence', 'Depends on snack supplies', '50/50'],
+    correctIndex: 1,
+    category: 'Couple Sacred Laws',
+    difficulty: 'Demigod Vows',
+    funFact: 'Imperial Physician Records confirm Sir Chif3n is permanently and incurably infatuated with Lady Leslye.'
+  },
+  {
+    id: 't-8',
+    question: 'In The Apothecary Diaries, what prized delicacy from the South Sea did Maomao analyze at the banquet for food allergies?',
+    options: ['Poisoned Pufferfish', 'Sea Cucumber & Prawns', 'Caviar Tartlets', 'Salted Dried Squid'],
+    correctIndex: 1,
+    category: 'The Apothecary Diaries',
+    difficulty: 'Palace Forensics',
+    funFact: 'Maomao saved an official by discovering he had a severe crustacean/shellfish anaphylactic reaction, not poison!'
+  }
+];
+
+const ALCHEMY_BASE_HERBS = [
+  { symbol: '🧪', herbName: 'Angelica Root' },
+  { symbol: '🌸', herbName: 'Royal Lotus' },
+  { symbol: '🌿', herbName: 'Sweet Licorice' },
+  { symbol: '🍄', herbName: 'Snow Fungus' },
+  { symbol: '🍂', herbName: 'Osmanthus' },
+  { symbol: '🏺', herbName: 'Ox-Bezoar' }
+];
+
+function generateShuffledCards(): AlchemyCard[] {
+  const pairs = ALCHEMY_BASE_HERBS.flatMap((h, i) => [
+    { id: i * 2, symbol: h.symbol, herbName: h.herbName, isMatched: false },
+    { id: i * 2 + 1, symbol: h.symbol, herbName: h.herbName, isMatched: false }
+  ]);
+  // Fisher-Yates shuffle
+  for (let i = pairs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
+  }
+  return pairs;
+}
+
+function checkBoardWinner(board: (string | null)[][], size: number, winLength: number): 'chif3n' | 'leslye' | 'draw' | null {
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      const p = board[r][c];
+      if (!p) continue;
+
+      // Horizontal
+      if (c + winLength <= size) {
+        let win = true;
+        for (let k = 0; k < winLength; k++) if (board[r][c + k] !== p) { win = false; break; }
+        if (win) return p as any;
+      }
+      // Vertical
+      if (r + winLength <= size) {
+        let win = true;
+        for (let k = 0; k < winLength; k++) if (board[r + k][c] !== p) { win = false; break; }
+        if (win) return p as any;
+      }
+      // Diagonal down-right
+      if (r + winLength <= size && c + winLength <= size) {
+        let win = true;
+        for (let k = 0; k < winLength; k++) if (board[r + k][c + k] !== p) { win = false; break; }
+        if (win) return p as any;
+      }
+      // Diagonal up-right
+      if (r - winLength + 1 >= 0 && c + winLength <= size) {
+        let win = true;
+        for (let k = 0; k < winLength; k++) if (board[r - k][c + k] !== p) { win = false; break; }
+        if (win) return p as any;
+      }
+    }
+  }
+  const isFull = board.every((row) => row.every((cell) => cell !== null));
+  if (isFull) return 'draw';
+  return null;
+}
+
+const DEFAULT_ARCADE_STATE: ArcadeState = {
+  activeGame: 'board',
+  boardGame: {
+    board: [
+      [null, null, null],
+      [null, null, null],
+      [null, null, null]
+    ],
+    mode: 'tictactoe',
+    gridSize: 3,
+    currentTurn: 'chif3n',
+    winner: null,
+    scores: { chif3n: 0, leslye: 0, ties: 0 },
+    lastMove: null
+  },
+  triviaGame: {
+    questionIndex: 0,
+    totalQuestions: TRIVIA_BANK.length,
+    currentQuestion: TRIVIA_BANK[0],
+    answers: { chif3n: null, leslye: null },
+    scores: { chif3n: 0, leslye: 0 },
+    revealed: false,
+    roundWinner: null
+  },
+  alchemyGame: {
+    cards: generateShuffledCards(),
+    flippedIndices: [],
+    currentTurn: 'chif3n',
+    scores: { chif3n: 0, leslye: 0 },
+    winner: null
+  },
+  presence: {
+    chif3n: true,
+    leslye: true,
+    lastPingChif3n: Date.now(),
+    lastPingLeslye: Date.now()
+  },
+  lastUpdated: Date.now()
+};
+
+function getInitialArcadeState(): ArcadeState {
+  try {
+    const saved = localStorage.getItem('imperial_arcade_state');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.boardGame && parsed.triviaGame && parsed.alchemyGame) {
+        return parsed;
+      }
+    }
+  } catch (e) {}
+  return DEFAULT_ARCADE_STATE;
+}
+
+export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
+  isOpen,
+  onClose,
+  onOpenLoginModal
+}) => {
+  // Always initialize with guaranteed state so games load immediately with ZERO blank screens
+  const [arcade, setArcade] = useState<ArcadeState>(() => getInitialArcadeState());
+  const [activeTab, setActiveTab] = useState<'board' | 'trivia' | 'alchemy'>(() => arcade.activeGame || 'board');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [syncStatus, setSyncStatus] = useState<string>('Ready');
 
   // Player identity
   const [myRole, setMyRole] = useState<'chif3n' | 'leslye'>(() => {
     try {
-      const saved = localStorage.getItem('leslye_game_role');
+      const saved = localStorage.getItem('leslye_active_user') || localStorage.getItem('leslye_game_role');
       if (saved === 'chif3n' || saved === 'leslye') return saved;
     } catch (e) {}
     return 'chif3n';
   });
 
   // Pass and play toggle for when playing together on one phone
-  const [passAndPlay, setPassAndPlay] = useState<boolean>(false);
+  const [passAndPlay, setPassAndPlay] = useState<boolean>(true);
+
+  // Broadcast channel for instantaneous cross-tab/cross-window local sync
+  const channelRef = useRef<BroadcastChannel | null>(null);
 
   // Web Audio sound synthesizer
   const playSfx = (type: 'move' | 'win' | 'match' | 'trivia') => {
@@ -125,24 +327,21 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({ isOpen, 
       } else if (type === 'match') {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(523.25, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(783.99, ctx.currentTime + 0.2);
         gain.gain.setValueAtTime(0.1, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
-        osc.stop(ctx.currentTime + 0.35);
+        osc.stop(ctx.currentTime + 0.3);
       } else if (type === 'win') {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.2);
-        osc.frequency.exponentialRampToValueAtTime(1174.66, ctx.currentTime + 0.4);
         gain.gain.setValueAtTime(0.12, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
-        osc.stop(ctx.currentTime + 0.6);
+        osc.stop(ctx.currentTime + 0.5);
       } else if (type === 'trivia') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(659.25, ctx.currentTime);
@@ -156,20 +355,39 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({ isOpen, 
     } catch (e) {}
   };
 
-  // Fetch latest state from server
+  // Save arcade state to local storage and broadcast channel
+  const persistAndBroadcast = (newState: ArcadeState) => {
+    setArcade(newState);
+    try {
+      localStorage.setItem('imperial_arcade_state', JSON.stringify(newState));
+      if (channelRef.current) {
+        channelRef.current.postMessage({ type: 'arcade_update', arcade: newState });
+      }
+    } catch (e) {}
+  };
+
+  // Fetch latest state from server (with graceful error handling)
   const fetchArcadeState = async () => {
     try {
       const res = await fetch('/api/game');
       if (res.ok) {
-        const json = await res.json();
-        if (json.arcade) {
-          setArcade(json.arcade);
-          if (json.arcade.activeGame) {
-            setActiveTab(json.arcade.activeGame);
+        const text = await res.text();
+        // Guard against html response from 404 or SPA redirects
+        if (text.startsWith('{')) {
+          const json = JSON.parse(text);
+          if (json.arcade) {
+            setArcade(json.arcade);
+            try {
+              localStorage.setItem('imperial_arcade_state', JSON.stringify(json.arcade));
+            } catch (e) {}
+            setSyncStatus('Cloud Live');
           }
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      // Offline or Netlify static fallback is fully supported!
+      setSyncStatus('Local Sanctum');
+    }
   };
 
   // Ping online presence
@@ -183,223 +401,370 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({ isOpen, 
     } catch (e) {}
   };
 
-  // Setup WebSocket connection and polling fallback
+  // Setup broadcast channel, background sync & fallback
   useEffect(() => {
     if (!isOpen) return;
 
+    // 1. Initialize BroadcastChannel for 0ms same-origin multi-tab sync
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      channelRef.current = new BroadcastChannel('imperial_couple_game_channel');
+      channelRef.current.onmessage = (event) => {
+        if (event.data?.type === 'arcade_update' && event.data.arcade) {
+          setArcade(event.data.arcade);
+        }
+      };
+    }
+
+    // 2. Fetch from backend if available
     fetchArcadeState();
     sendPresencePing();
 
     const interval = setInterval(() => {
-      fetchArcadeState();
-      sendPresencePing();
-    }, 1500);
-
-    // WebSocket connection for instant 0ms latency moves across phones
-    let ws: WebSocket | null = null;
-    try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}`;
-      ws = new WebSocket(wsUrl);
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'arcade_update' && data.arcade) {
-            setArcade(data.arcade);
-            if (data.arcade.activeGame) {
-              setActiveTab(data.arcade.activeGame);
-            }
-          } else if (data.type === 'init' && data.arcade) {
-            setArcade(data.arcade);
-          }
-        } catch (err) {}
-      };
-    } catch (err) {}
+      if (!passAndPlay) {
+        fetchArcadeState();
+      }
+    }, 2000);
 
     return () => {
       clearInterval(interval);
-      if (ws) ws.close();
+      if (channelRef.current) {
+        channelRef.current.close();
+      }
     };
-  }, [isOpen, myRole]);
+  }, [isOpen, passAndPlay]);
 
   const handleSelectRole = (role: 'chif3n' | 'leslye') => {
     setMyRole(role);
     try {
+      localStorage.setItem('leslye_active_user', role);
       localStorage.setItem('leslye_game_role', role);
     } catch (e) {}
     sendPresencePing();
   };
 
-  const handleSwitchTab = async (gameType: 'board' | 'trivia' | 'alchemy') => {
+  const handleSwitchTab = (gameType: 'board' | 'trivia' | 'alchemy') => {
     setActiveTab(gameType);
+    const updated: ArcadeState = {
+      ...arcade,
+      activeGame: gameType,
+      lastUpdated: Date.now()
+    };
+    persistAndBroadcast(updated);
+
     try {
-      await fetch('/api/game/switch', {
+      fetch('/api/game/switch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gameType })
-      });
+      }).catch(() => {});
     } catch (e) {}
   };
 
-  // -------------------------
-  // GAME 1: Board Game Move
-  // -------------------------
-  const handleBoardCellClick = async (row: number, col: number) => {
-    if (!arcade) return;
+  // ==========================================
+  // GAME 1: BOARD DUEL (TIC-TAC-TOE & GOMOKU)
+  // ==========================================
+  const handleBoardCellClick = (row: number, col: number) => {
     const bg = arcade.boardGame;
     if (bg.winner !== null || bg.board[row][col] !== null) return;
     if (!passAndPlay && bg.currentTurn !== myRole) return;
 
     const movingPlayer = passAndPlay ? bg.currentTurn : myRole;
+    playSfx('move');
 
-    // Optimistic local update
-    const updated = bg.board.map((r, rIdx) =>
+    // Create updated board
+    const newBoard = bg.board.map((r, rIdx) =>
       r.map((c, cIdx) => (rIdx === row && cIdx === col ? movingPlayer : c))
     );
-    setArcade((prev) => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        boardGame: {
-          ...prev.boardGame,
-          board: updated,
-          currentTurn: movingPlayer === 'chif3n' ? 'leslye' : 'chif3n'
-        }
-      };
-    });
 
-    playSfx('move');
-    setIsSyncing(true);
+    const winLength = bg.mode === 'gomoku' ? 4 : 3;
+    const winner = checkBoardWinner(newBoard, bg.gridSize, winLength);
 
+    const newScores = { ...bg.scores };
+    if (winner === 'chif3n') {
+      newScores.chif3n += 1;
+      playSfx('win');
+    } else if (winner === 'leslye') {
+      newScores.leslye += 1;
+      playSfx('win');
+    } else if (winner === 'draw') {
+      newScores.ties += 1;
+      playSfx('match');
+    }
+
+    const nextTurn = movingPlayer === 'chif3n' ? 'leslye' : 'chif3n';
+
+    const updatedState: ArcadeState = {
+      ...arcade,
+      boardGame: {
+        ...bg,
+        board: newBoard,
+        currentTurn: nextTurn,
+        winner,
+        scores: newScores,
+        lastMove: { row, col, player: movingPlayer }
+      },
+      lastUpdated: Date.now()
+    };
+
+    persistAndBroadcast(updatedState);
+
+    // Optional sync to server
     try {
-      const res = await fetch('/api/game/board/move', {
+      fetch('/api/game/board/move', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ row, col, player: movingPlayer })
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.arcade) {
-          setArcade(json.arcade);
-          if (json.arcade.boardGame.winner) playSfx('win');
-        }
-      }
-    } catch (e) {
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  const handleResetBoard = async () => {
-    try {
-      const res = await fetch('/api/game/board/reset', { method: 'POST' });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.arcade) setArcade(json.arcade);
-      }
+      }).catch(() => {});
     } catch (e) {}
   };
 
-  const handleToggleBoardMode = async (mode: 'tictactoe' | 'gomoku') => {
+  const handleResetBoard = () => {
+    const size = arcade.boardGame.gridSize;
+    const cleanBoard = Array.from({ length: size }, () => Array(size).fill(null));
+
+    const updated: ArcadeState = {
+      ...arcade,
+      boardGame: {
+        ...arcade.boardGame,
+        board: cleanBoard,
+        winner: null,
+        lastMove: null
+      },
+      lastUpdated: Date.now()
+    };
+    persistAndBroadcast(updated);
+
     try {
-      const res = await fetch('/api/game/board/mode', {
+      fetch('/api/game/board/reset', { method: 'POST' }).catch(() => {});
+    } catch (e) {}
+  };
+
+  const handleToggleBoardMode = (mode: 'tictactoe' | 'gomoku') => {
+    const size = mode === 'gomoku' ? 6 : 3;
+    const cleanBoard = Array.from({ length: size }, () => Array(size).fill(null));
+
+    const updated: ArcadeState = {
+      ...arcade,
+      boardGame: {
+        ...arcade.boardGame,
+        mode,
+        gridSize: size,
+        board: cleanBoard,
+        winner: null,
+        lastMove: null
+      },
+      lastUpdated: Date.now()
+    };
+    persistAndBroadcast(updated);
+
+    try {
+      fetch('/api/game/board/mode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mode })
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.arcade) setArcade(json.arcade);
-      }
+      }).catch(() => {});
     } catch (e) {}
   };
 
-  // -------------------------
-  // GAME 2: Trivia Answers
-  // -------------------------
-  const handleAnswerTrivia = async (answerIndex: number) => {
-    if (!arcade) return;
+  // ==========================================
+  // GAME 2: ANIME & APOTHECARY TRIVIA
+  // ==========================================
+  const handleAnswerTrivia = (answerIndex: number) => {
     const tg = arcade.triviaGame;
     if (tg.revealed) return;
 
-    const answeringPlayer = passAndPlay ? (tg.answers.chif3n === null ? 'chif3n' : 'leslye') : myRole;
-
     playSfx('trivia');
+
+    const answeringPlayer = passAndPlay
+      ? tg.answers.chif3n === null
+        ? 'chif3n'
+        : 'leslye'
+      : myRole;
+
+    const newAnswers = { ...tg.answers, [answeringPlayer]: answerIndex };
+    let revealed = false;
+    let roundWinner = null;
+    const newScores = { ...tg.scores };
+
+    // In pass and play or when both answered, reveal!
+    if (passAndPlay) {
+      if (newAnswers.chif3n !== null && newAnswers.leslye !== null) {
+        revealed = true;
+      }
+    } else {
+      if (newAnswers.chif3n !== null && newAnswers.leslye !== null) {
+        revealed = true;
+      }
+    }
+
+    if (revealed) {
+      const correct = tg.currentQuestion.correctIndex;
+      if (newAnswers.chif3n === correct && newAnswers.leslye === correct) {
+        newScores.chif3n += 10;
+        newScores.leslye += 10;
+        roundWinner = 'tie';
+        playSfx('win');
+      } else if (newAnswers.chif3n === correct) {
+        newScores.chif3n += 10;
+        roundWinner = 'chif3n';
+        playSfx('win');
+      } else if (newAnswers.leslye === correct) {
+        newScores.leslye += 10;
+        roundWinner = 'leslye';
+        playSfx('win');
+      } else {
+        roundWinner = 'none';
+      }
+    }
+
+    const updated: ArcadeState = {
+      ...arcade,
+      triviaGame: {
+        ...tg,
+        answers: newAnswers,
+        scores: newScores,
+        revealed,
+        roundWinner
+      },
+      lastUpdated: Date.now()
+    };
+
+    persistAndBroadcast(updated);
+
     try {
-      const res = await fetch('/api/game/trivia/answer', {
+      fetch('/api/game/trivia/answer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ player: answeringPlayer, answerIndex })
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.arcade) {
-          setArcade(json.arcade);
-          if (json.arcade.triviaGame.revealed) playSfx('match');
-        }
-      }
+      }).catch(() => {});
     } catch (e) {}
   };
 
-  const handleNextTrivia = async () => {
+  const handleNextTrivia = () => {
+    const tg = arcade.triviaGame;
+    const nextIdx = (tg.questionIndex + 1) % TRIVIA_BANK.length;
+
+    const updated: ArcadeState = {
+      ...arcade,
+      triviaGame: {
+        ...tg,
+        questionIndex: nextIdx,
+        currentQuestion: TRIVIA_BANK[nextIdx],
+        answers: { chif3n: null, leslye: null },
+        revealed: false,
+        roundWinner: null
+      },
+      lastUpdated: Date.now()
+    };
+    persistAndBroadcast(updated);
+
     try {
-      const res = await fetch('/api/game/trivia/next', { method: 'POST' });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.arcade) setArcade(json.arcade);
-      }
+      fetch('/api/game/trivia/next', { method: 'POST' }).catch(() => {});
     } catch (e) {}
   };
 
-  // -------------------------
-  // GAME 3: Alchemy Card Flip
-  // -------------------------
-  const handleAlchemyFlip = async (cardIndex: number) => {
-    if (!arcade) return;
+  // ==========================================
+  // GAME 3: ALCHEMY HERB MEMORY MATCH-2
+  // ==========================================
+  const handleAlchemyFlip = (cardIndex: number) => {
     const ag = arcade.alchemyGame;
     if (ag.winner !== null) return;
     if (!passAndPlay && ag.currentTurn !== myRole) return;
     if (ag.cards[cardIndex].isMatched || ag.flippedIndices.includes(cardIndex)) return;
-
-    const flippingPlayer = passAndPlay ? ag.currentTurn : myRole;
+    if (ag.flippedIndices.length >= 2) return;
 
     playSfx('move');
-    try {
-      const res = await fetch('/api/game/alchemy/flip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardIndex, player: flippingPlayer })
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.arcade) {
-          setArcade(json.arcade);
-          if (json.arcade.alchemyGame.winner) playSfx('win');
+
+    const flippingPlayer = passAndPlay ? ag.currentTurn : myRole;
+    const newFlipped = [...ag.flippedIndices, cardIndex];
+
+    const updatedAg: AlchemyGameState = {
+      ...ag,
+      flippedIndices: newFlipped
+    };
+
+    // If 2 cards are now flipped, evaluate match!
+    if (newFlipped.length === 2) {
+      const [idx1, idx2] = newFlipped;
+      const card1 = ag.cards[idx1];
+      const card2 = ag.cards[idx2];
+
+      if (card1.symbol === card2.symbol) {
+        // MATCH!
+        playSfx('match');
+        const updatedCards = ag.cards.map((c, i) =>
+          i === idx1 || i === idx2 ? { ...c, isMatched: true, matchedBy: flippingPlayer } : c
+        );
+        const newScores = {
+          ...ag.scores,
+          [flippingPlayer]: ag.scores[flippingPlayer] + 10
+        };
+
+        let winner: 'chif3n' | 'leslye' | 'draw' | null = null;
+        if (updatedCards.every((c) => c.isMatched)) {
+          if (newScores.chif3n > newScores.leslye) winner = 'chif3n';
+          else if (newScores.leslye > newScores.chif3n) winner = 'leslye';
+          else winner = 'draw';
+          playSfx('win');
         }
+
+        updatedAg.cards = updatedCards;
+        updatedAg.scores = newScores;
+        updatedAg.flippedIndices = [];
+        updatedAg.winner = winner;
+      } else {
+        // NO MATCH: flip back after 1.1s
+        setTimeout(() => {
+          setArcade((prev) => {
+            const nextTurn = flippingPlayer === 'chif3n' ? 'leslye' : 'chif3n';
+            const state: ArcadeState = {
+              ...prev,
+              alchemyGame: {
+                ...prev.alchemyGame,
+                flippedIndices: [],
+                currentTurn: nextTurn
+              },
+              lastUpdated: Date.now()
+            };
+            persistAndBroadcast(state);
+            return state;
+          });
+        }, 1100);
       }
-    } catch (e) {}
+    }
+
+    const updatedState: ArcadeState = {
+      ...arcade,
+      alchemyGame: updatedAg,
+      lastUpdated: Date.now()
+    };
+    persistAndBroadcast(updatedState);
   };
 
-  const handleResetAlchemy = async () => {
-    try {
-      const res = await fetch('/api/game/alchemy/reset', { method: 'POST' });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.arcade) setArcade(json.arcade);
-      }
-    } catch (e) {}
+  const handleResetAlchemy = () => {
+    const updated: ArcadeState = {
+      ...arcade,
+      alchemyGame: {
+        cards: generateShuffledCards(),
+        flippedIndices: [],
+        currentTurn: 'chif3n',
+        scores: { chif3n: 0, leslye: 0 },
+        winner: null
+      },
+      lastUpdated: Date.now()
+    };
+    persistAndBroadcast(updated);
   };
 
   if (!isOpen) return null;
 
-  const boardGame = arcade?.boardGame;
-  const triviaGame = arcade?.triviaGame;
-  const alchemyGame = arcade?.alchemyGame;
-  const presence = arcade?.presence;
+  const boardGame = arcade.boardGame;
+  const triviaGame = arcade.triviaGame;
+  const alchemyGame = arcade.alchemyGame;
+  const presence = arcade.presence;
 
-  const isMyBoardTurn = boardGame ? (passAndPlay || boardGame.currentTurn === myRole) && boardGame.winner === null : false;
-  const isMyAlchemyTurn = alchemyGame ? (passAndPlay || alchemyGame.currentTurn === myRole) && alchemyGame.winner === null : false;
+  const isMyBoardTurn = (passAndPlay || boardGame.currentTurn === myRole) && boardGame.winner === null;
+  const isMyAlchemyTurn = (passAndPlay || alchemyGame.currentTurn === myRole) && alchemyGame.winner === null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
@@ -419,7 +784,7 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({ isOpen, 
                   Imperial Palace Arcade 🎮
                 </span>
                 <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-emerald-900/80 text-emerald-300 border border-emerald-600/40">
-                  Live 2-Player IRL
+                  {syncStatus}
                 </span>
               </div>
               <h3 className="font-cinzel text-base sm:text-lg font-bold text-white">
@@ -440,7 +805,7 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({ isOpen, 
         <div className="p-2.5 rounded-xl bg-[#04120a] border border-emerald-900/80 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
           {/* Identity */}
           <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
-            <span className="text-[11px] text-emerald-400 font-mono">Playing as:</span>
+            <span className="text-[11px] text-emerald-400 font-mono">You are:</span>
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => handleSelectRole('chif3n')}
@@ -467,22 +832,28 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({ isOpen, 
             </div>
           </div>
 
-          {/* Online Presence Status */}
-          <div className="flex items-center gap-3 text-[10px] font-mono">
-            <div className="flex items-center gap-1">
-              <span className={`w-2 h-2 rounded-full ${presence?.chif3n ? 'bg-emerald-400 animate-ping' : 'bg-zinc-600'}`} />
-              <span className={presence?.chif3n ? 'text-emerald-300' : 'text-zinc-500'}>
-                Chif3n {presence?.chif3n ? 'Online' : 'Offline'}
-              </span>
-            </div>
-            <span className="text-zinc-600">·</span>
-            <div className="flex items-center gap-1">
-              <span className={`w-2 h-2 rounded-full ${presence?.leslye ? 'bg-emerald-400 animate-ping' : 'bg-zinc-600'}`} />
-              <span className={presence?.leslye ? 'text-emerald-300' : 'text-zinc-500'}>
-                Leslye {presence?.leslye ? 'Online' : 'Offline'}
-              </span>
-            </div>
-          </div>
+          {/* Mode Switcher: Single Device vs Dual Phone */}
+          <button
+            onClick={() => setPassAndPlay(!passAndPlay)}
+            className={`px-2.5 py-1 rounded-lg border font-mono text-[10px] transition-all flex items-center gap-1 ${
+              passAndPlay
+                ? 'bg-amber-400/20 text-amber-300 border-amber-400/60 font-bold'
+                : 'bg-emerald-950 text-emerald-300 border-emerald-700'
+            }`}
+            title="Toggle between playing on one phone vs 2 different phones"
+          >
+            {passAndPlay ? (
+              <>
+                <Smartphone className="w-3 h-3 text-amber-400" />
+                <span>📱 1-Phone (Take Turns)</span>
+              </>
+            ) : (
+              <>
+                <Globe className="w-3 h-3 text-emerald-400" />
+                <span>🌐 Dual-Phone Sync</span>
+              </>
+            )}
+          </button>
         </div>
 
         {/* 3 Games Navigation Pill Row */}
@@ -527,7 +898,7 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({ isOpen, 
         {/* ======================================================== */}
         {/* GAME 1: IMPERIAL BOARD DUEL (TIC-TAC-TOE & GOMOKU)       */}
         {/* ======================================================== */}
-        {activeTab === 'board' && boardGame && (
+        {activeTab === 'board' && (
           <div className="space-y-3.5 animate-in fade-in">
             {/* Mode & Scores */}
             <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -554,16 +925,12 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({ isOpen, 
                 </button>
               </div>
 
-              {/* Pass and Play local toggle */}
               <button
-                onClick={() => setPassAndPlay(!passAndPlay)}
-                className={`text-[10px] px-2 py-1 rounded-md border font-mono transition-all ${
-                  passAndPlay
-                    ? 'bg-amber-400/20 text-amber-300 border-amber-400'
-                    : 'bg-[#030e08] text-zinc-500 border-zinc-800'
-                }`}
+                onClick={handleResetBoard}
+                className="px-2.5 py-1 rounded-lg bg-[#04120a] hover:bg-emerald-900/40 text-emerald-300 border border-emerald-800 text-xs flex items-center gap-1"
               >
-                {passAndPlay ? '📱 Single-Device Mode' : '🌐 Real-Time 2 Phones'}
+                <RotateCcw className="w-3 h-3" />
+                <span>Clear Grid</span>
               </button>
             </div>
 
@@ -598,215 +965,211 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({ isOpen, 
                 </span>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-2 text-xs font-mono">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span className={isMyBoardTurn ? 'text-amber-300 font-bold' : 'text-emerald-400/80'}>
-                  {isMyBoardTurn
-                    ? 'Your turn! Tap an empty tile to place your royal token.'
-                    : `Waiting for ${boardGame.currentTurn === 'chif3n' ? 'Sir Chif3n' : 'Lady Leslye'} to move...`}
+              <div className="p-2 rounded-xl bg-[#05170e] border border-emerald-800/80 text-xs font-mono flex items-center justify-center gap-2">
+                <span>Current Turn:</span>
+                <span className={`font-bold flex items-center gap-1 ${
+                  boardGame.currentTurn === 'chif3n' ? 'text-amber-300' : 'text-emerald-400'
+                }`}>
+                  {boardGame.currentTurn === 'chif3n' ? '👑 Sir Chif3n' : '🌿 Lady Leslye'}
+                  {passAndPlay ? '(Take Turn)' : isMyBoardTurn ? '· YOUR TURN!' : '· Waiting...'}
                 </span>
               </div>
             )}
 
             {/* Board Grid */}
             <div
-              className={`grid gap-1.5 p-3 rounded-2xl bg-[#030c08] border border-emerald-900/80 mx-auto shadow-inner ${
-                boardGame.gridSize === 6
-                  ? 'grid-cols-6 max-w-[340px] aspect-square'
-                  : 'grid-cols-3 max-w-[280px] aspect-square'
+              className={`grid gap-2 mx-auto ${
+                boardGame.gridSize === 3 ? 'grid-cols-3 max-w-[280px]' : 'grid-cols-6 max-w-[340px]'
               }`}
             >
               {boardGame.board.map((row, rIdx) =>
-                row.map((cell, cIdx) => {
-                  const isChif3n = cell === 'chif3n';
-                  const isLeslye = cell === 'leslye';
-
-                  return (
-                    <button
-                      key={`${rIdx}-${cIdx}`}
-                      onClick={() => handleBoardCellClick(rIdx, cIdx)}
-                      disabled={cell !== null || boardGame.winner !== null || !isMyBoardTurn}
-                      className={`rounded-xl border transition-all flex items-center justify-center select-none ${
-                        boardGame.gridSize === 6 ? 'text-base p-1' : 'text-3xl'
-                      } ${
-                        cell === null
-                          ? isMyBoardTurn
-                            ? 'border-emerald-800/80 hover:border-amber-400 hover:bg-emerald-950/40 cursor-pointer active:scale-95'
-                            : 'border-emerald-950 opacity-60 cursor-not-allowed'
-                          : isChif3n
-                          ? 'bg-amber-400/20 border-amber-400 text-amber-300 shadow-md'
-                          : 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-md'
-                      }`}
-                    >
-                      {isChif3n && <Crown className={`${boardGame.gridSize === 6 ? 'w-5 h-5' : 'w-8 h-8'} text-amber-300 fill-amber-300/40`} />}
-                      {isLeslye && <Leaf className={`${boardGame.gridSize === 6 ? 'w-5 h-5' : 'w-8 h-8'} text-emerald-400 fill-emerald-400/40`} />}
-                    </button>
-                  );
-                })
+                row.map((cell, cIdx) => (
+                  <button
+                    key={`${rIdx}-${cIdx}`}
+                    onClick={() => handleBoardCellClick(rIdx, cIdx)}
+                    disabled={cell !== null || boardGame.winner !== null || (!passAndPlay && !isMyBoardTurn)}
+                    className={`aspect-square rounded-xl border flex items-center justify-center transition-all ${
+                      cell === null
+                        ? 'bg-[#030e08]/90 border-emerald-800/70 hover:border-amber-400/80 hover:bg-[#061e12] active:scale-95'
+                        : cell === 'chif3n'
+                        ? 'bg-amber-400/20 border-amber-400 shadow-md shadow-amber-950/40'
+                        : 'bg-emerald-500/20 border-emerald-400 shadow-md shadow-emerald-950/40'
+                    }`}
+                  >
+                    {cell === 'chif3n' && (
+                      <span className="text-2xl sm:text-3xl animate-in zoom-in-75">👑</span>
+                    )}
+                    {cell === 'leslye' && (
+                      <span className="text-2xl sm:text-3xl animate-in zoom-in-75">🌿</span>
+                    )}
+                  </button>
+                ))
               )}
-            </div>
-
-            {/* Reset Board Button */}
-            <div className="flex items-center justify-between text-xs pt-1">
-              <span className="text-[10px] text-emerald-500 font-mono">
-                {boardGame.mode === 'gomoku' ? 'Connect 4 in a row to win' : 'Classic 3 in a row'}
-              </span>
-              <button
-                onClick={handleResetBoard}
-                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-amber-600 hover:from-emerald-500 hover:to-amber-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>{boardGame.winner ? 'Next Round' : 'Reset Grid'}</span>
-              </button>
             </div>
           </div>
         )}
 
         {/* ======================================================== */}
-        {/* GAME 2: DEMIGOD & ANIME TRIVIA SHOWDOWN                  */}
+        {/* GAME 2: ANIME & APOTHECARY TRIVIA                        */}
         {/* ======================================================== */}
-        {activeTab === 'trivia' && triviaGame && (
-          <div className="space-y-3.5 animate-in fade-in text-left">
-            {/* Trivia Header & Scoreboard */}
-            <div className="flex items-center justify-between bg-[#030e08] p-2.5 rounded-xl border border-rose-900/60">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-950 text-rose-300 border border-rose-500/40">
-                  Question #{triviaGame.questionIndex + 1} / {triviaGame.totalQuestions}
-                </span>
-                <span className="text-xs text-amber-300 font-cinzel">
-                  {triviaGame.currentQuestion.category}
+        {activeTab === 'trivia' && (
+          <div className="space-y-4 animate-in fade-in text-left">
+            {/* Header / Category & Score */}
+            <div className="flex items-center justify-between text-xs pb-1 border-b border-emerald-900/60">
+              <div className="flex items-center gap-1.5">
+                <Brain className="w-3.5 h-3.5 text-rose-400" />
+                <span className="font-cinzel text-amber-300 font-bold">
+                  {triviaGame.currentQuestion.category} · Question {triviaGame.questionIndex + 1}/{triviaGame.totalQuestions}
                 </span>
               </div>
-
-              {/* Live Scores */}
-              <div className="flex items-center gap-3 text-xs font-mono">
-                <span className="text-amber-300 font-bold">Chif3n: {triviaGame.scores.chif3n} pts</span>
-                <span className="text-zinc-600">|</span>
-                <span className="text-emerald-300 font-bold">Leslye: {triviaGame.scores.leslye} pts</span>
+              <div className="flex items-center gap-3 font-mono text-[11px]">
+                <span className="text-amber-300">Chif3n: {triviaGame.scores.chif3n}</span>
+                <span className="text-zinc-600">·</span>
+                <span className="text-emerald-400">Leslye: {triviaGame.scores.leslye}</span>
               </div>
             </div>
 
-            {/* Question Card */}
-            <div className="p-4 rounded-xl bg-[#04120a] border border-amber-400/40 space-y-2">
-              <span className="text-[10px] text-amber-400 font-mono uppercase tracking-wider block">
-                [ {triviaGame.currentQuestion.difficulty} ]
+            {/* Question Text */}
+            <div className="p-4 rounded-xl bg-[#04120a] border border-emerald-800 space-y-1">
+              <span className="text-[10px] uppercase font-mono text-emerald-500 font-bold block">
+                {triviaGame.currentQuestion.difficulty}
               </span>
-              <h4 className="font-serif text-sm sm:text-base text-white font-semibold leading-relaxed">
+              <p className="font-serif text-sm sm:text-base text-white leading-relaxed font-semibold">
                 "{triviaGame.currentQuestion.question}"
-              </h4>
+              </p>
             </div>
 
-            {/* Options Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {triviaGame.currentQuestion.options.map((option, optIdx) => {
-                const isCorrect = optIdx === triviaGame.currentQuestion.correctIndex;
-                const myAnswer = triviaGame.answers[myRole];
-                const isSelectedByMe = myAnswer === optIdx;
-                const chif3nPick = triviaGame.answers.chif3n === optIdx;
-                const leslyePick = triviaGame.answers.leslye === optIdx;
+            {/* Answer Options */}
+            <div className="grid grid-cols-1 gap-2">
+              {triviaGame.currentQuestion.options.map((opt, idx) => {
+                const isCorrect = idx === triviaGame.currentQuestion.correctIndex;
+                const isSelectedByChif3n = triviaGame.answers.chif3n === idx;
+                const isSelectedByLeslye = triviaGame.answers.leslye === idx;
 
-                let btnStyle = "bg-[#030c08] border-emerald-900/80 text-emerald-100 hover:border-amber-400 hover:bg-emerald-950/40";
+                let optStyle = 'bg-[#030e08] border-emerald-900/80 hover:border-emerald-600 text-emerald-100';
                 if (triviaGame.revealed) {
                   if (isCorrect) {
-                    btnStyle = "bg-emerald-600/30 border-emerald-400 text-emerald-200 font-bold";
-                  } else if (isSelectedByMe) {
-                    btnStyle = "bg-rose-950/40 border-rose-500 text-rose-300";
-                  } else {
-                    btnStyle = "bg-[#030c08] border-zinc-900 text-zinc-500 opacity-60";
+                    optStyle = 'bg-emerald-600/30 border-emerald-400 text-emerald-200 font-bold ring-1 ring-emerald-400';
+                  } else if (isSelectedByChif3n || isSelectedByLeslye) {
+                    optStyle = 'bg-rose-950/40 border-rose-600/60 text-rose-300 line-through opacity-70';
                   }
-                } else if (isSelectedByMe) {
-                  btnStyle = "bg-amber-400/20 border-amber-400 text-amber-200 font-bold";
                 }
 
                 return (
                   <button
-                    key={optIdx}
-                    onClick={() => handleAnswerTrivia(optIdx)}
-                    disabled={triviaGame.revealed || myAnswer !== null}
-                    className={`p-3 rounded-xl border text-left text-xs transition-all flex items-center justify-between gap-2 ${btnStyle}`}
+                    key={idx}
+                    onClick={() => handleAnswerTrivia(idx)}
+                    disabled={triviaGame.revealed}
+                    className={`w-full p-3 rounded-xl border text-left text-xs transition-all flex items-center justify-between gap-3 ${optStyle}`}
                   >
-                    <span>{option}</span>
+                    <div className="flex items-center gap-2.5 truncate">
+                      <span className="w-5 h-5 rounded-md bg-black/60 border border-emerald-900 flex items-center justify-center font-mono text-[10px] shrink-0">
+                        {String.fromCharCode(65 + idx)}
+                      </span>
+                      <span className="truncate">{opt}</span>
+                    </div>
+
+                    {/* Reveal badging */}
                     <div className="flex items-center gap-1 shrink-0">
-                      {triviaGame.revealed && isCorrect && <CheckCircle className="w-4 h-4 text-emerald-400" />}
-                      {chif3nPick && <span title="Chif3n's Pick"><Crown className="w-3.5 h-3.5 text-amber-300" /></span>}
-                      {leslyePick && <span title="Leslye's Pick"><Leaf className="w-3.5 h-3.5 text-emerald-400" /></span>}
+                      {isSelectedByChif3n && <span className="text-xs" title="Chif3n Chose This">👑</span>}
+                      {isSelectedByLeslye && <span className="text-xs" title="Leslye Chose This">🌿</span>}
+                      {triviaGame.revealed && isCorrect && (
+                        <Check className="w-4 h-4 text-emerald-400 ml-1" />
+                      )}
                     </div>
                   </button>
                 );
               })}
             </div>
 
-            {/* Revealed Fun Fact & Next CTA */}
-            {triviaGame.revealed ? (
-              <div className="p-3 rounded-xl bg-[#06180f] border border-emerald-500/50 space-y-2 animate-in fade-in">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-300 flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Apothecary Lore & Fun Fact:</span>
+            {/* Reveal Fun Fact & Next Question Button */}
+            {triviaGame.revealed && (
+              <div className="p-3.5 rounded-xl bg-[#061e12] border border-amber-400/50 space-y-2 animate-in zoom-in-95">
+                <div className="flex items-center gap-2 text-amber-300 font-cinzel text-xs font-bold">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>
+                    {triviaGame.roundWinner === 'tie'
+                      ? 'Both Got It Right! +10 Points to Both ❤️'
+                      : triviaGame.roundWinner === 'chif3n'
+                      ? 'Sir Chif3n Scored! +10 Points 👑'
+                      : triviaGame.roundWinner === 'leslye'
+                      ? 'Lady Leslye Scored! +10 Points 🌿'
+                      : 'Neither got it! The palace mystery remains deep.'}
                   </span>
+                </div>
+                <p className="text-xs text-emerald-100 font-serif italic">
+                  💡 {triviaGame.currentQuestion.funFact}
+                </p>
+                <div className="pt-2 text-right">
                   <button
                     onClick={handleNextTrivia}
-                    className="px-3 py-1 rounded-lg bg-gradient-to-r from-emerald-600 to-amber-600 text-white font-bold text-xs shadow-md active:scale-95"
+                    className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 text-black font-bold text-xs shadow-md"
                   >
-                    Next Question ➔
+                    Next Question →
                   </button>
                 </div>
-                <p className="text-xs text-emerald-200 italic font-serif leading-relaxed">
-                  {triviaGame.currentQuestion.funFact}
-                </p>
-              </div>
-            ) : (
-              <div className="text-center text-xs font-mono text-emerald-400/80 pt-1">
-                {triviaGame.answers[myRole] !== null
-                  ? "✓ Answer locked in! Waiting for your partner's answer to reveal scores..."
-                  : "Pick your answer! +10 Points for the correct answer."}
               </div>
             )}
           </div>
         )}
 
         {/* ======================================================== */}
-        {/* GAME 3: HERBAL ALCHEMY MEMORY DUEL                       */}
+        {/* GAME 3: ALCHEMY HERB MEMORY MATCH-2                      */}
         {/* ======================================================== */}
-        {activeTab === 'alchemy' && alchemyGame && (
+        {activeTab === 'alchemy' && (
           <div className="space-y-3.5 animate-in fade-in">
-            {/* Header & Scoreboard */}
-            <div className="flex items-center justify-between bg-[#030e08] p-2.5 rounded-xl border border-emerald-900/60 text-xs">
-              <span className="text-[11px] text-emerald-300 font-cinzel">
-                Apothecary Potion Alchemy
+            {/* Header & Scores */}
+            <div className="flex items-center justify-between text-xs pb-1 border-b border-emerald-900/60">
+              <span className="font-cinzel text-amber-300 font-bold">
+                12-Herb Match-2 Sanctuary Duel
               </span>
-              <div className="flex items-center gap-3 font-mono">
-                <span className="text-amber-300 font-bold">Chif3n: {alchemyGame.scores.chif3n} 🧪</span>
-                <span className="text-zinc-600">|</span>
-                <span className="text-emerald-300 font-bold">Leslye: {alchemyGame.scores.leslye} 🧪</span>
+              <div className="flex items-center gap-3 font-mono text-[11px]">
+                <span className="text-amber-300">Chif3n: {alchemyGame.scores.chif3n}</span>
+                <span className="text-zinc-600">·</span>
+                <span className="text-emerald-400">Leslye: {alchemyGame.scores.leslye}</span>
               </div>
             </div>
 
-            {/* Turn Announcement */}
+            {/* Winner or Current Turn */}
             {alchemyGame.winner ? (
-              <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-teal-500/20 border border-amber-400/50">
+              <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-rose-500/20 border border-amber-400/50 animate-in zoom-in-95">
                 <span className="font-cinzel text-xs sm:text-sm font-bold text-amber-300 flex items-center justify-center gap-2">
-                  <Trophy className="w-4 h-4 text-amber-400" />
+                  <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
                   <span>
                     {alchemyGame.winner === 'draw'
-                      ? "Equal Potion Masters! A perfect tie."
-                      : `${alchemyGame.winner === 'chif3n' ? 'Sir Chif3n' : 'Lady Leslye'} is the Supreme Imperial Apothecary!`}
+                      ? 'Tie! Both are master herbalists.'
+                      : alchemyGame.winner === 'chif3n'
+                      ? 'Sir Chif3n Mastered the Herbs! 👑'
+                      : 'Lady Leslye Reigns Supreme! 🌿'}
                   </span>
                 </span>
+                <button
+                  onClick={handleResetAlchemy}
+                  className="mt-2 px-3 py-1 rounded-lg bg-amber-400 text-black font-bold text-xs"
+                >
+                  Play Again
+                </button>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-2 text-xs font-mono">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span className={isMyAlchemyTurn ? 'text-amber-300 font-bold' : 'text-emerald-400/80'}>
-                  {isMyAlchemyTurn
-                    ? "Your turn! Flip 2 imperial herb tiles to brew a potion match."
-                    : `Waiting for ${alchemyGame.currentTurn === 'chif3n' ? 'Sir Chif3n' : 'Lady Leslye'} to flip...`}
+              <div className="flex items-center justify-between p-2 rounded-xl bg-[#05170e] border border-emerald-800 text-xs font-mono">
+                <span>Turn:</span>
+                <span className={`font-bold flex items-center gap-1 ${
+                  alchemyGame.currentTurn === 'chif3n' ? 'text-amber-300' : 'text-emerald-400'
+                }`}>
+                  {alchemyGame.currentTurn === 'chif3n' ? '👑 Sir Chif3n' : '🌿 Lady Leslye'}
+                  {passAndPlay ? '(Tap 2 Cards)' : isMyAlchemyTurn ? '· YOUR TURN!' : '· Waiting...'}
                 </span>
+                <button
+                  onClick={handleResetAlchemy}
+                  className="text-zinc-400 hover:text-white text-[10px]"
+                >
+                  Reshuffle
+                </button>
               </div>
             )}
 
-            {/* 16-Card Memory Grid (4x4) */}
-            <div className="grid grid-cols-4 gap-2 max-w-[320px] mx-auto">
+            {/* 12 Cards Grid (3x4) */}
+            <div className="grid grid-cols-4 gap-2 max-w-sm mx-auto">
               {alchemyGame.cards.map((card, idx) => {
                 const isFlipped = alchemyGame.flippedIndices.includes(idx) || card.isMatched;
 
@@ -814,60 +1177,43 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({ isOpen, 
                   <button
                     key={card.id}
                     onClick={() => handleAlchemyFlip(idx)}
-                    disabled={card.isMatched || alchemyGame.flippedIndices.includes(idx) || !isMyAlchemyTurn}
-                    className={`aspect-square rounded-xl border transition-all flex flex-col items-center justify-center select-none text-2xl shadow-md ${
-                      isFlipped
-                        ? card.isMatched
-                          ? card.matchedBy === 'chif3n'
-                            ? 'bg-amber-400/20 border-amber-400 text-amber-300'
-                            : 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
-                          : 'bg-emerald-950/80 border-amber-400/80 text-white'
-                        : isMyAlchemyTurn
-                        ? 'bg-[#030e08] border-emerald-900 hover:border-amber-400 cursor-pointer active:scale-95'
-                        : 'bg-[#020a06] border-emerald-950 opacity-60'
+                    disabled={isFlipped || (!passAndPlay && !isMyAlchemyTurn) || alchemyGame.winner !== null}
+                    className={`aspect-square rounded-xl border p-1 flex flex-col items-center justify-center transition-all ${
+                      card.isMatched
+                        ? 'bg-emerald-950/70 border-emerald-500/80 text-emerald-200'
+                        : isFlipped
+                        ? 'bg-amber-400/20 border-amber-400 text-white animate-in zoom-in-75'
+                        : 'bg-[#03110a] border-emerald-900/80 hover:border-emerald-600 hover:bg-[#051e12] active:scale-95'
                     }`}
                   >
                     {isFlipped ? (
                       <>
-                        <span>{card.symbol}</span>
-                        <span className="text-[8px] font-mono text-emerald-300 truncate max-w-full px-1">
-                          {card.herbName}
+                        <span className="text-2xl">{card.symbol}</span>
+                        <span className="text-[8px] font-mono truncate max-w-full text-emerald-300 mt-0.5">
+                          {card.herbName.split(' ')[0]}
                         </span>
                       </>
                     ) : (
-                      <span className="text-emerald-700 text-lg">🧪</span>
+                      <div className="w-full h-full rounded-lg border border-dashed border-emerald-800/60 flex items-center justify-center text-emerald-700 font-serif text-sm">
+                        🌿
+                      </div>
                     )}
                   </button>
                 );
               })}
             </div>
-
-            {/* Reset Alchemy Deck */}
-            <div className="flex items-center justify-between text-xs pt-1">
-              <span className="text-[10px] text-emerald-500 font-mono">
-                Match pairs to brew potions & score +10 pts
-              </span>
-              <button
-                onClick={handleResetAlchemy}
-                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-amber-600 text-white font-bold text-xs flex items-center gap-1.5 shadow-md active:scale-95"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reshuffle Potions</span>
-              </button>
-            </div>
           </div>
         )}
 
-        {/* Footer couple note */}
-        <div className="pt-2 border-t border-emerald-900/60 flex items-center justify-between text-xs">
-          <span className="text-[10px] text-emerald-400/80 font-mono">
-            Synced live via WebSocket across both phones
-          </span>
-
-          <span className="text-[10px] text-amber-300/80 font-mono flex items-center gap-1">
-            <Heart className="w-3 h-3 text-rose-400 fill-rose-400" />
-            <span>Loser owes a royal cuddle!</span>
-          </span>
+        {/* Footer info */}
+        <div className="pt-2 text-[10px] text-emerald-500/80 font-mono border-t border-emerald-950 flex items-center justify-between">
+          <span>Active Role: <strong className="text-white">{myRole === 'leslye' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑'}</strong></span>
+          <button
+            onClick={onOpenLoginModal}
+            className="text-amber-300 underline font-semibold hover:text-white"
+          >
+            Switch Profile
+          </button>
         </div>
       </div>
     </div>

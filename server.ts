@@ -916,6 +916,33 @@ app.post('/api/scrolls', (req: Request, res: Response) => {
   });
 });
 
+// Webhook endpoint for external integrations, cloud relays & notifications
+app.post('/api/webhook/chat', (req: Request, res: Response) => {
+  const { sender, senderRole, text, message, content, author } = req.body;
+  const msgText = (text || message || content || '').trim();
+  if (!msgText) {
+    return res.status(400).json({ success: false, message: 'Missing message content' });
+  }
+
+  const newScroll: LiveLoveScroll = {
+    id: `scroll-wh-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    sender: (sender || author || 'Imperial Envoy 📜').trim(),
+    senderRole: senderRole || 'demigod',
+    text: msgText,
+    timestamp: Date.now()
+  };
+
+  liveLoveScrolls.push(newScroll);
+  if (liveLoveScrolls.length > 200) liveLoveScrolls.shift();
+  broadcastScroll(newScroll);
+
+  res.json({ success: true, message: newScroll, webhook: true });
+});
+
+app.get('/api/webhook/chat', (req: Request, res: Response) => {
+  res.json({ success: true, count: liveLoveScrolls.length, messages: liveLoveScrolls.slice(-20) });
+});
+
 // -------------------------------------------------------------
 // 7. Real-Time Couple Multi-Game Arcade Endpoints
 // -------------------------------------------------------------
