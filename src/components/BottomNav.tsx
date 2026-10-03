@@ -4,9 +4,16 @@ import { Tv, BookOpen, Layers, Crown } from 'lucide-react';
 interface BottomNavProps {
   activeTab: 'browse' | 'manga' | 'novels' | 'demigod-picks';
   onSelectTab: (tab: 'browse' | 'manga' | 'novels' | 'demigod-picks') => void;
+  onOpenChatVault?: () => void;
+  unreadMessagesCount?: number;
 }
 
-export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) => {
+export const BottomNav: React.FC<BottomNavProps> = ({
+  activeTab,
+  onSelectTab,
+  onOpenChatVault,
+  unreadMessagesCount = 0
+}) => {
   return (
     <nav className="md:hidden fixed bottom-3 left-3 right-3 z-40 bg-[#06150fe0] backdrop-blur-xl border border-emerald-600/40 rounded-2xl shadow-2xl p-1.5 flex items-center justify-around text-xs">
       <button
@@ -56,6 +63,21 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onSelectTab }) 
         <span className="text-sm">👑</span>
         <span className="text-[10px] tracking-tight">Picks ❤️</span>
       </button>
+
+      {onOpenChatVault && (
+        <button
+          onClick={onOpenChatVault}
+          className="flex-1 py-1.5 px-2 rounded-xl flex flex-col items-center gap-1 transition-all text-rose-300 hover:text-white relative"
+        >
+          <span className="text-sm">💌</span>
+          <span className="text-[10px] tracking-tight">Vault</span>
+          {unreadMessagesCount > 0 && (
+            <span className="absolute top-1 right-2 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center animate-bounce shadow">
+              {unreadMessagesCount}
+            </span>
+          )}
+        </button>
+      )}
     </nav>
   );
 };

@@ -11,7 +11,9 @@ import {
   BookOpen,
   Feather,
   Crown,
-  Gamepad2
+  Gamepad2,
+  Bell,
+  BellRing
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -28,6 +30,9 @@ interface NavbarProps {
   ambientMode: 'stars' | 'sakura' | 'off';
   onToggleAmbient: () => void;
   dateNightCount: number;
+  unreadMessagesCount?: number;
+  notificationsEnabled?: boolean;
+  onToggleNotifications?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -44,6 +49,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   ambientMode,
   onToggleAmbient,
   dateNightCount,
+  unreadMessagesCount = 0,
+  notificationsEnabled = false,
+  onToggleNotifications,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -159,15 +167,42 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Vows & Poetry</span>
           </button>
 
+          {/* Web Notification Alert Toggle */}
+          {onToggleNotifications && (
+            <button
+              onClick={onToggleNotifications}
+              className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 ${
+                notificationsEnabled
+                  ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
+                  : 'bg-[#04140e] border-emerald-800/60 hover:border-amber-400 text-zinc-400 hover:text-amber-300'
+              }`}
+              title={notificationsEnabled ? 'Alerts Active (Receiving Chimes & Push Notifications)' : 'Click to Enable Background Alerts for New Messages'}
+            >
+              {notificationsEnabled ? (
+                <BellRing className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              ) : (
+                <Bell className="w-3.5 h-3.5 text-amber-400" />
+              )}
+              <span className="hidden xl:inline">
+                {notificationsEnabled ? 'Alerts Active' : 'Enable Alerts'}
+              </span>
+            </button>
+          )}
+
           {/* Imperial Secret Vault (Chat) */}
           {onOpenChatVault && (
             <button
               onClick={onOpenChatVault}
-              className="px-3 py-1.5 rounded-xl border border-rose-500/50 bg-gradient-to-r from-rose-950/70 via-pink-950/50 to-amber-950/60 hover:border-rose-400 text-rose-200 hover:text-white text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+              className="relative px-3 py-1.5 rounded-xl border border-rose-500/50 bg-gradient-to-r from-rose-950/70 via-pink-950/50 to-amber-950/60 hover:border-rose-400 text-rose-200 hover:text-white text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
               title="Open The Imperial Secret Vault (Passcode Protected Chat)"
             >
               <Heart className="w-3.5 h-3.5 fill-rose-400 text-rose-400 animate-pulse" />
               <span>Secret Vault 💌</span>
+              {unreadMessagesCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold shadow-md animate-bounce">
+                  {unreadMessagesCount}
+                </span>
+              )}
             </button>
           )}
 
@@ -239,10 +274,37 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onOpenChatVault();
                 setMobileMenuOpen(false);
               }}
-              className="w-full text-left px-3 py-2.5 rounded-xl bg-gradient-to-r from-rose-950/80 via-pink-950/60 to-amber-950/70 border border-rose-500/50 text-xs font-bold text-rose-200 flex items-center gap-2 shadow-sm"
+              className="w-full text-left px-3 py-2.5 rounded-xl bg-gradient-to-r from-rose-950/80 via-pink-950/60 to-amber-950/70 border border-rose-500/50 text-xs font-bold text-rose-200 flex items-center justify-between shadow-sm"
             >
-              <Heart className="w-4 h-4 fill-rose-400 text-rose-400 animate-pulse" />
-              <span>💌 The Imperial Secret Vault (Private Chat)</span>
+              <div className="flex items-center gap-2">
+                <Heart className="w-4 h-4 fill-rose-400 text-rose-400 animate-pulse" />
+                <span>💌 The Imperial Secret Vault (Private Chat)</span>
+              </div>
+              {unreadMessagesCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold shadow-md animate-bounce">
+                  {unreadMessagesCount} New
+                </span>
+              )}
+            </button>
+          )}
+
+          {onToggleNotifications && (
+            <button
+              onClick={() => {
+                onToggleNotifications();
+              }}
+              className={`w-full text-left px-3 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all ${
+                notificationsEnabled
+                  ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
+                  : 'bg-[#04140e] border-emerald-800/60 text-amber-300'
+              }`}
+            >
+              {notificationsEnabled ? (
+                <BellRing className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Bell className="w-4 h-4 text-amber-400" />
+              )}
+              <span>{notificationsEnabled ? '🔔 Background Alerts Active' : '🔔 Enable Background Alerts'}</span>
             </button>
           )}
 

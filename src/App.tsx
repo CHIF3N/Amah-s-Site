@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search,
   Sparkles,
@@ -21,7 +21,9 @@ import {
   Radio,
   Dice5,
   Zap,
-  Filter
+  Filter,
+  Bell,
+  BellRing
 } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
@@ -47,6 +49,40 @@ import { AmbientCanvas } from './components/AmbientCanvas';
 import { AnimeItem, DateNightItem, WatchHistoryItem, DailyWatchActivity } from './types/anime';
 import { CURATED_ANIME, DEMIGOD_SCROLLS, MAOMAO_STATEMENTS_FOR_LESLYE } from './data/curatedData';
 import { searchAnime, fetchRecentAnime, sortAnimeByRecent } from './services/jikanApi';
+import { subscribeToLoveScrolls } from './services/firebase';
+
+/**
+ * Gentle herbal chime synthesizer using Web Audio API harmonics
+ */
+function playHerbalChime() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    // Harmonics: 587.33Hz (D5), 880Hz (A5), 1174.66Hz (D6)
+    const freqs = [587.33, 880, 1174.66];
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+
+      const startTime = ctx.currentTime + idx * 0.07;
+      const duration = 0.9;
+      gain.gain.setValueAtTime(0.001, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.08 / (idx + 1), startTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    });
+  } catch (e) {
+    console.warn('Audio chime warning:', e);
+  }
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'browse' | 'airing' | 'manga' | 'novels' | 'demigod-picks' | 'date-night' | 'love-scrolls'>('browse');

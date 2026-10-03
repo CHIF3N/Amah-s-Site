@@ -32,8 +32,10 @@ import {
 import {
   subscribeToActiveArcadeSession,
   updateActiveArcadeSession,
-  ArcadeCloudState
+  ArcadeCloudState,
+  db
 } from '../services/firebase';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 
 interface ImperialCoupleGameProps {
   isOpen: boolean;
@@ -239,16 +241,31 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
     } catch (e) {}
   };
 
-  // Subscribe to Cloud Firestore activeSession
+  // Subscribe to Cloud Firestore globalSharedSession
   useEffect(() => {
     if (!isOpen) return;
 
-    const unsubscribe = subscribeToActiveArcadeSession((cloudData) => {
-      if (cloudData && cloudData.gameId) {
-        setSession(cloudData);
-        playSound(523, 'triangle', 0.1);
+    const docRef = doc(db, 'coupleArcade', 'globalSharedSession');
+    const unsubscribe = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data() as ArcadeCloudState;
+          if (data && data.gameId) {
+            setSession(data);
+            playSound(523, 'triangle', 0.1);
+          }
+        } else {
+          // Initialize shared room document if it doesn't exist yet
+          setDoc(docRef, DEFAULT_CLOUD_STATE).catch((err) =>
+            console.warn('Initial session bootstrap warning:', err)
+          );
+        }
+      },
+      (error) => {
+        console.warn('globalSharedSession subscription warning:', error);
       }
-    });
+    );
 
     return () => {
       unsubscribe();
@@ -257,7 +274,7 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
 
   const isMyTurn = passAndPlay || session.turn === myRole;
 
-  // Generic Cloud Dispatcher
+  // Generic Cloud Dispatcher to single constant shared Firestore document
   const dispatchStateUpdate = async (nextState: Partial<ArcadeCloudState>) => {
     const merged: ArcadeCloudState = {
       ...session,
@@ -271,8 +288,14 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
 
     setSession(merged);
     setIsSyncing(true);
-    await updateActiveArcadeSession(merged);
-    setIsSyncing(false);
+    try {
+      const docRef = doc(db, 'coupleArcade', 'globalSharedSession');
+      await setDoc(docRef, { ...merged, lastUpdated: Date.now() }, { merge: true });
+    } catch (err) {
+      console.error('Failed to sync to globalSharedSession:', err);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   // Switch Game Mode

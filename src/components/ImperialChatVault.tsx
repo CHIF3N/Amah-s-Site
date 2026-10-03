@@ -22,7 +22,9 @@ import {
   Maximize2,
   ZoomIn,
   Download,
-  Volume2
+  Volume2,
+  Bell,
+  BellRing
 } from 'lucide-react';
 import {
   subscribeToLoveScrolls,
@@ -100,7 +102,7 @@ function getStoredMessages(): LiveLoveMessage[] {
 }
 
 /**
- * Custom Apothecary Voice Player component with waveform animation and scrubber
+ * Custom Apothecary Voice Player component with waveform animation, native <audio preload="auto">, and cross-device decoders
  */
 const ApothecaryAudioPlayer: React.FC<{ audioUrl: string; duration?: number; isChif3n: boolean }> = ({
   audioUrl,
@@ -112,30 +114,12 @@ const ApothecaryAudioPlayer: React.FC<{ audioUrl: string; duration?: number; isC
   const [totalDuration, setTotalDuration] = useState(duration || 0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Sync duration if passed as prop
   useEffect(() => {
-    const audio = new Audio(audioUrl);
-    audioRef.current = audio;
-
-    audio.onloadedmetadata = () => {
-      if (audio.duration && !isNaN(audio.duration) && isFinite(audio.duration)) {
-        setTotalDuration(Math.round(audio.duration));
-      }
-    };
-
-    audio.ontimeupdate = () => {
-      setCurrentTime(audio.currentTime);
-    };
-
-    audio.onended = () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-    };
-
-    return () => {
-      audio.pause();
-      audio.src = '';
-    };
-  }, [audioUrl]);
+    if (duration && duration > 0) {
+      setTotalDuration(duration);
+    }
+  }, [duration]);
 
   const togglePlay = () => {
     if (!audioRef.current) return;
@@ -143,8 +127,16 @@ const ApothecaryAudioPlayer: React.FC<{ audioUrl: string; duration?: number; isC
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      audioRef.current.play().catch((err) => console.warn('Audio play error:', err));
-      setIsPlaying(true);
+      audioRef.current.volume = 1.0;
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => setIsPlaying(true))
+          .catch((err) => {
+            console.warn('Audio play error:', err);
+            setIsPlaying(false);
+          });
+      }
     }
   };
 
@@ -164,7 +156,31 @@ const ApothecaryAudioPlayer: React.FC<{ audioUrl: string; duration?: number; isC
           : 'bg-[#041a10] border-emerald-500/40 text-emerald-200'
       }`}
     >
+      {/* Hidden Native Audio Element with preload="auto" and cross-device Base64 decoding */}
+      <audio
+        ref={audioRef}
+        src={audioUrl}
+        preload="auto"
+        playsInline={true}
+        onLoadedMetadata={(e) => {
+          const d = e.currentTarget.duration;
+          if (d && !isNaN(d) && isFinite(d)) {
+            setTotalDuration(Math.round(d));
+          }
+        }}
+        onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+        onEnded={() => {
+          setIsPlaying(false);
+          setCurrentTime(0);
+        }}
+        onError={(e) => {
+          console.warn('Native audio element error:', e);
+          setIsPlaying(false);
+        }}
+      />
+
       <button
+        type="button"
         onClick={togglePlay}
         className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 shadow-md transition-all active:scale-95 ${
           isChif3n
@@ -245,6 +261,14 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
   });
 
   const [showPresets, setShowPresets] = useState(false);
+
+  // Notification state
+  const [notificationsActive, setNotificationsActive] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission === 'granted';
+    }
+    return false;
+  });
 
   // Voice recording states
   const [isRecording, setIsRecording] = useState(false);
@@ -343,12 +367,30 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
         return;
       }
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+
+      // Detect optimal supported audio MIME type across iOS Safari and Chrome/Android
+      let selectedMime = '';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          selectedMime = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          selectedMime = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+          selectedMime = 'audio/ogg';
+        } else if (MediaRecorder.isTypeSupported('audio/webm')) {
+          selectedMime = 'audio/webm';
+        }
+      }
+
+      const recorder = selectedMime
+        ? new MediaRecorder(stream, { mimeType: selectedMime })
+        : new MediaRecorder(stream);
+
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
+        if (e.data && e.data.size > 0) {
           audioChunksRef.current.push(e.data);
         }
       };
@@ -381,19 +423,20 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
   const sendVoiceRecording = () => {
     if (!mediaRecorderRef.current) return;
     const duration = recordingSeconds;
+    const recordedMime = mediaRecorderRef.current.mimeType || 'audio/webm';
 
     mediaRecorderRef.current.onstop = () => {
-      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      const audioBlob = new Blob(audioChunksRef.current, { type: recordedMime });
       const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
       reader.onloadend = async () => {
-        const base64Audio = reader.result as string;
+        const base64Audio = reader.result as string; // 'data:audio/...;base64,...'
         await dispatchMultimediaMessage({
           type: 'audio',
           audioUrl: base64Audio,
           duration: Math.max(1, duration)
         });
       };
-      reader.readAsDataURL(audioBlob);
 
       mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop());
     };
@@ -623,6 +666,37 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
               Cloud Synchronized
             </span>
           </div>
+
+          {/* Alert Permission Button */}
+          <button
+            onClick={async () => {
+              if (typeof window !== 'undefined' && 'Notification' in window) {
+                if (Notification.permission !== 'granted') {
+                  const perm = await Notification.requestPermission();
+                  if (perm === 'granted') {
+                    setNotificationsActive(true);
+                  }
+                } else {
+                  setNotificationsActive(true);
+                }
+              }
+            }}
+            className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono flex items-center gap-1.5 transition-colors ${
+              notificationsActive
+                ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
+                : 'bg-[#04140e] border-emerald-900 text-zinc-400 hover:text-amber-300'
+            }`}
+            title="Enable Background Notifications"
+          >
+            {notificationsActive ? (
+              <BellRing className="w-3.5 h-3.5 text-emerald-400" />
+            ) : (
+              <Bell className="w-3.5 h-3.5 text-amber-400" />
+            )}
+            <span className="hidden sm:inline">
+              {notificationsActive ? 'Alerts Active' : 'Enable Alerts'}
+            </span>
+          </button>
 
           {/* Lock Vault Button */}
           <button

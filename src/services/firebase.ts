@@ -169,11 +169,11 @@ export interface ArcadeCloudState {
 }
 
 /**
- * Real-time listener for the activeSession document in Firestore
+ * Real-time listener for the globalSharedSession document in Firestore
  */
 export function subscribeToActiveArcadeSession(onUpdate: (state: ArcadeCloudState) => void): () => void {
   try {
-    const docRef = doc(db, 'coupleArcade', 'activeSession');
+    const docRef = doc(db, 'coupleArcade', 'globalSharedSession');
     const unsubscribe = onSnapshot(
       docRef,
       (snapshot) => {
@@ -185,29 +185,29 @@ export function subscribeToActiveArcadeSession(onUpdate: (state: ArcadeCloudStat
         }
       },
       (error) => {
-        console.warn('[Firestore] activeSession subscription warning:', error);
+        console.warn('[Firestore] globalSharedSession subscription warning:', error);
       }
     );
     return unsubscribe;
   } catch (err) {
-    console.warn('[Firestore] Error initializing activeSession listener:', err);
+    console.warn('[Firestore] Error initializing globalSharedSession listener:', err);
     return () => {};
   }
 }
 
 /**
- * Update the shared activeSession document in Firestore
+ * Update the shared globalSharedSession document in Firestore
  */
 export async function updateActiveArcadeSession(state: Partial<ArcadeCloudState>): Promise<boolean> {
   try {
-    const docRef = doc(db, 'coupleArcade', 'activeSession');
+    const docRef = doc(db, 'coupleArcade', 'globalSharedSession');
     await setDoc(docRef, {
       ...state,
       lastUpdated: Date.now()
     }, { merge: true });
     return true;
   } catch (err) {
-    console.error('[Firestore] Failed to update activeSession:', err);
+    console.error('[Firestore] Failed to update globalSharedSession:', err);
     return false;
   }
 }
