@@ -10,7 +10,8 @@ import {
   Calendar,
   BookOpen,
   Feather,
-  Crown
+  Crown,
+  Gamepad2
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -20,6 +21,7 @@ interface NavbarProps {
   onOpenGacha: () => void;
   onOpenRadio: () => void;
   onOpenPoetry: () => void;
+  onOpenGame?: () => void;
   ambientMode: 'stars' | 'sakura' | 'off';
   onToggleAmbient: () => void;
   dateNightCount: number;
@@ -32,6 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenGacha,
   onOpenRadio,
   onOpenPoetry,
+  onOpenGame,
   ambientMode,
   onToggleAmbient,
   dateNightCount,
@@ -76,6 +79,18 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Desktop Quick Triggers & Navigation */}
         <div className="hidden lg:flex items-center gap-2">
+          {/* Couple Game Trigger */}
+          {onOpenGame && (
+            <button
+              onClick={onOpenGame}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-400/50 hover:border-amber-300 text-xs text-amber-300 hover:text-white transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+              title="Play Real-Time Couple Game across different phones"
+            >
+              <Gamepad2 className="w-3.5 h-3.5 text-amber-400" />
+              <span>Couple Duel 🎮</span>
+            </button>
+          )}
+
           {/* Schedule Trigger */}
           <button
             onClick={onOpenSchedule}
@@ -88,19 +103,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Gacha Altar Trigger */}
           <button
             onClick={onOpenGacha}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-emerald-500/20 border border-amber-500/40 hover:border-amber-400 text-xs text-amber-300 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
+            className="px-3 py-1.5 rounded-xl bg-[#04140e] border border-amber-500/40 hover:border-amber-400 text-xs text-amber-300 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
           >
             <Dice5 className="w-3.5 h-3.5 text-amber-400" />
-            <span>Gacha Altar</span>
+            <span>Gacha</span>
           </button>
 
-          {/* Lo-Fi Radio Trigger */}
+          {/* Lo-Fi Piano & Radio Trigger */}
           <button
             onClick={onOpenRadio}
             className="px-3 py-1.5 rounded-xl bg-[#04140e] border border-emerald-800/80 hover:border-emerald-500 text-xs text-emerald-200 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
           >
             <Radio className="w-3.5 h-3.5 text-emerald-400" />
-            <span>OST Lo-Fi</span>
+            <span>Piano & Lo-Fi</span>
           </button>
 
           {/* Vows & Poetry Modal Trigger */}
@@ -142,22 +157,24 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Mobile menu trigger */}
+        {/* Mobile menu triggers */}
         <div className="flex items-center gap-2 lg:hidden">
+          {onOpenGame && (
+            <button
+              onClick={onOpenGame}
+              className="p-2 rounded-xl bg-amber-500/20 border border-amber-400 text-amber-300"
+              title="Play Couple Game"
+            >
+              <Gamepad2 className="w-4 h-4" />
+            </button>
+          )}
+
           <button
             onClick={onOpenRadio}
             className="p-2 rounded-xl bg-[#04140e] border border-emerald-800 text-emerald-300"
-            title="Open Lo-Fi Radio"
+            title="Open Piano & Lo-Fi"
           >
             <Radio className="w-4 h-4 text-emerald-400" />
-          </button>
-
-          <button
-            onClick={onOpenGacha}
-            className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-300"
-            title="Open Gacha Altar"
-          >
-            <Dice5 className="w-4 h-4" />
           </button>
 
           <button
@@ -173,7 +190,33 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="lg:hidden pt-3 pb-2 border-t border-emerald-900/60 mt-2 space-y-1.5 animate-in fade-in slide-in-from-top-2">
+          {onOpenGame && (
+            <button
+              onClick={() => {
+                onOpenGame();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-2.5 rounded-xl bg-amber-500/20 border border-amber-400 text-xs font-bold text-amber-300 flex items-center gap-2"
+            >
+              <Gamepad2 className="w-4 h-4 text-amber-400" />
+              <span>🎮 Play Real-Time Couple Duel (IRL Online)</span>
+            </button>
+          )}
+
           <div className="grid grid-cols-2 gap-2 pb-2">
+            {onOpenGame && (
+              <button
+                onClick={() => {
+                  onOpenGame();
+                  setMobileMenuOpen(false);
+                }}
+                className="col-span-2 p-2.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-rose-500/20 border border-amber-400/50 text-xs text-amber-300 font-bold flex items-center justify-center gap-2 shadow-sm"
+              >
+                <Gamepad2 className="w-4 h-4 text-amber-400" />
+                <span>Palace Arcade (2-Player IRL Duel) 🎮</span>
+              </button>
+            )}
+
             <button
               onClick={() => {
                 onOpenSchedule();
@@ -218,7 +261,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               activeTab === 'manga' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
             }`}
           >
-            📜 Manga Scrolls (MangaDex)
+            📜 Manga Scrolls (5+ Complete Series)
           </button>
 
           <button
@@ -230,7 +273,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               activeTab === 'novels' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
             }`}
           >
-            📖 Imperial Tomes (Novels)
+            📖 Imperial Tomes & Facebook Sagas (20 Novels)
           </button>
 
           <button

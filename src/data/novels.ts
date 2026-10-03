@@ -17,14 +17,13 @@ export interface CuratedNovel {
   category: 'light-novel' | 'facebook-story' | 'imported';
   tags: string[];
   chif3nNote: string;
-  novelUpdatesUrl?: string;
-  externalReadUrl?: string;
+  freeReadUrl?: string; // 100% free public archive link (no paywalls, no subscriptions)
   chapters: NovelChapter[];
 }
 
 export const PRELOADED_NOVELS: CuratedNovel[] = [
   // =========================================================================
-  // 1. LIGHT NOVELS (EXPANDED COMPLETE SAGAS)
+  // 1. LIGHT NOVELS (COMPLETE IN-APP CHAPTERS & FREE OPEN SOURCES)
   // =========================================================================
   {
     id: 'apothecary-diaries',
@@ -37,8 +36,7 @@ export const PRELOADED_NOVELS: CuratedNovel[] = [
     synopsis: 'In an imperial court rife with whispers and deadly concubine rivalries, Maomao, an eccentric young pharmacist from the pleasure district, finds herself drafted into service. Her insatiable obsession with poisons and medicinal herbs becomes the rear palace\'s greatest salvation.',
     tags: ['Apothecary', 'Court Mystery', 'Historical', 'Romance', 'Medical Alchemist'],
     chif3nNote: 'Our absolute favorite! Dedicated to Leslye: your cleverness, quiet grace, and fierce spirit mirror Maomao in every single chapter. 🌿✨',
-    novelUpdatesUrl: 'https://www.novelupdates.com/series/kusuriya-no-hitorigoto/',
-    externalReadUrl: 'https://j-novel.club/series/the-apothecary-diaries',
+    freeReadUrl: 'https://freewebnovel.com/kusuriya-no-hitorigoto.html',
     chapters: [
       {
         id: 'ad-prologue',
@@ -67,8 +65,6 @@ Inside the suffocating dark of the sack, Maomao had not wept. She had not scream
 
 Instead, she gently wiggled her fingers, checking if her nails were intact. *Two years of scrubbing floors in exchange for three square meals and lodging? I can endure that. So long as no one discovers I can read, write, or brew antimony, I will blend into the mortar of the palace walls like an ordinary speck of dust.*
 
-She had no desire for imperial glory, no dreams of catching a nobleman's fleeting eye. She merely wanted to return to her apothecary shop in one piece.
-
 Yet fate, as bitter and unpredictable as powdered gentian root, had entirely different plans.`
       },
       {
@@ -96,9 +92,7 @@ That evening, by pure coincidence, the entourages of the two high-ranking consor
 
 Lady Lifa, the proud consort of the Crystal Pavilion, was surrounded by six fluttering maids. In her arms she cradled a wailing baby boy, his forehead wrapped in silk compresses. A few paces away stood Lady Gyokuyou, the gentle red-haired favorite of the Jade Pavilion, clutching her sick three-month-old daughter.
 
-Maomao hid behind a stone pillar, watching with narrowed eyes.
-
-Both mothers were weeping softly. And both mothers wore identical makeup: thick, alabaster-white powder dusted lavishly across their faces, necks, and exposed shoulders.
+Maomao hid behind a stone pillar, watching with narrowed eyes. Both mothers were weeping softly. And both mothers wore identical makeup: thick, alabaster-white powder dusted lavishly across their faces, necks, and exposed shoulders.
 
 Maomao's nostrils flared. Her apothecary instincts flared like dry tinder catching a spark.
 
@@ -106,179 +100,91 @@ Maomao's nostrils flared. Her apothecary instincts flared like dry tinder catchi
 
 The palace concubines craved snow-white complexions to please His Imperial Majesty. They slathered themselves in the imported face powder from dawn until dusk. When they cradled their infants, breastfed them, or kissed their delicate cheeks, the babies inhaled and ingested microscopic flakes of toxic white lead.
 
-Lead poisoning in adults caused abdominal cramps, tooth decay, and dull headaches. In fragile newborns, it caused brain swelling, uncontrollable convulsions, projectile vomiting, and inevitable death.
-
 *It isn't a supernatural curse at all. They are poisoning their own children with vanity.*
 
-Maomao bit her lower lip until it bled. As a low-ranking scullery maid, stepping forward to instruct high consorts would be branded as insolence punishable by fifty cane lashes or public execution.
+Maomao bit her lower lip until it bled. Stepping forward openly would mean fifty cane lashes for insolence. Instead, under cover of darkness, she crushed azalea leaves into dark red juice, tore strips of bleached linen, and wrote two anonymous warnings in neat calligraphy:
 
-Yet she could not stand by and allow two innocent babies to suffocate in their cribs.
+*"The powder that whitens your skin is venom to newborn breath. Cleanse your breasts and discard the white clay, or your child will perish within the cycle of the moon."*
 
-"Forgive me, Luomen," she muttered beneath her breath. "My curiosity—and my conscience—refuse to remain quiet."`
+She pinned one note to Lady Gyokuyou's pavilion lattice and the other outside Lady Lifa's chamber.
+
+She thought her duty was discharged. She had no idea who was already watching her from the shadows.`
       },
       {
         id: 'ad-ch2',
         chapterNumber: 2,
-        title: 'Chapter 2: An Anonymous Message in Cinnabar',
-        wordCount: 1520,
-        content: `Under the shroud of the midnight moon, Maomao crept toward the apothecary supply storehouse. 
+        title: 'Chapter 2: The Scent of Heavenly Cinnamon',
+        wordCount: 1720,
+        content: `Two weeks later, the outcome of her anonymous warning shook the rear palace to its core.
 
-Because she was on night laundry duty, the eunuch night watch paid little attention to the thin silhouette slipping past the willow trees. She slipped through the side window with the agility of a stray cat.
+Lady Gyokuyou, perceptive and deeply concerned for her daughter's survival, had immediately washed away her white lead powder and ordered her wet nurses to do the same. Within five days, Princess Lingli’s fever broke and her rashes cleared into healthy porcelain skin.
 
-She did not steal precious musk or pearls. She merely retrieved a scrap of bleached linen, a piece of dry charcoal, and a tiny dab of crushed red cinnabar paste.
+Lady Lifa, on the other hand, had flown into a rage at the anonymous note, calling it peasant slander. Her chief lady-in-waiting continued applying the poisonous powder with dense sponges. Yesterday, the tolling of the brass funeral gong announced that the infant prince had passed away.
 
-On the linen scrap, she pressed her thoughts in neat, elegant imperial script—the calligraphy Luomen had drilled into her hands since she was five years old:
+Maomao kept her head bowed as she carried laundry baskets through the central courtyard. But a pair of silk embroidered slippers stepped directly into her path.
 
-『The white face powder contains the poison of lead. It seeps through the skin and settles in the milk. If you value the precious life of the young royal flower, wash your skin clean with pure spring water. Discard the alabaster cosmetics at once.』
+A cloud of sweet, intoxicating scent enveloped her—rare celestial agarwood blended with cinnamon and ambergris.
 
-She tied the parchment securely around a fragrant stalk of winter chrysanthemum.
+Maomao looked up. 
 
-She knew approaching the Crystal Pavilion was suicide; Lady Lifa's head maid was notorious for beating lower servants without trial. But the Jade Pavilion of Lady Gyokuyou was reputed to have a warmer, more compassionate mistress.
+Standing before her was Jinshi.
 
-Reaching the wooden balustrade of the Jade Pavilion, Maomao tied the ribbon to a carved lattice window and slipped away like a ghost into the misty palace mist.
+Even among the most radiant beauties of the imperial capital, Jinshi’s appearance bordered on the supernatural. His hair was black silk, his skin flawless jade, and his violet eyes held a teasing, celestial glow that made court ladies faint in corridors. Officially, he was a high-ranking eunuch charged with administering the rear palace. Unofficially, he was a calculating spider who missed nothing.
 
-Three days later, news struck the Rear Palace like a thunderclap.
+"Tell me, little maid," Jinshi purred, his lips curling into an angelic yet terrifying smile as he held up a torn strip of linen written in dried red azalea ink. "Do you know who wrote this?"
 
-At the Crystal Pavilion, Lady Lifa's head maid had discovered a similar warning, laughed it off as jealous slander, and tossed it into the brazier. The imperial prince's condition deteriorated rapidly. By dawn, the child had ceased breathing. Wailing echoed from the Crystal Pavilion across the palace lakes.
+Maomao blinked once. She kept her face blank, acting like an ignorant peasant. "I cannot read, my Lord."
 
-At the Jade Pavilion, however, Lady Gyokuyou had taken the message seriously. 
+Jinshi leaned down, his warm breath grazing her ear. He gently lifted her left hand. His long, graceful fingers traced the calluses along her fingertips—the unmistakable markings of someone who held medicine pestles and carving knives every single day of her youth.
 
-She had immediately ordered all face powder washed away with well water and prohibited cosmetics in the nursery. Within forty-eight hours, Princess Lingli's fever broke. Her crimson sores began to heal.
+"You have the hands of an artisan, not a scullery maid," Jinshi whispered, his eyes flashing with triumph. "And Lady Gyokuyou insists on meeting the savior of her daughter. From today onward, Maomao, your laundry duties are over. You are appointed as Lady Gyokuyou’s personal lady-in-waiting—and her royal poison tester."
 
-And at the center of the Jade Pavilion, an ethereal figure stood contemplating the linen strip.
+Maomao’s eye twitched. *Poison tester?! Getting paid to ingest rare toxins every single day?!* 
 
-Jinshi, the palace administrator whose otherworldly beauty caused both men and women to swoon in stupor, touched the elegant calligraphy with his long, manicured fingers.
-
-"Whoever wrote this saved the Emperor's only remaining heir," Jinshi murmured, his purple-tinged eyes gleaming with razor-sharp curiosity. "Find her. I want to meet this miraculous little maid who knows more than the Imperial Physicians."`
+For the first time since entering the palace, a broad, unsettling grin broke across Maomao's freckled face.`
       },
       {
         id: 'ad-ch3',
         chapterNumber: 3,
-        title: 'Chapter 3: Summoned by the Celestial Eunuch',
-        wordCount: 1740,
-        content: `Maomao was on her knees washing grease from iron stewpots when a pair of black satin slippers with silver cloud embroidery stopped directly in front of her pail.
+        title: 'Chapter 3: The Banquet of Deceit',
+        wordCount: 1850,
+        content: `The Imperial Garden Banquet was a sea of crimson silk, golden dragon banners, and jade goblets.
 
-She lifted her chin slowly.
+Four royal consorts sat in order of prestige: Lady Gyokuyou of the Jade Pavilion, Lady Lifa of the Crystal Pavilion, Lady Ah-Duo of the Garnet Pavilion, and Lady Lishu of the Diamond Pavilion.
 
-Before her stood an attendant eunuch holding a royal vermilion tablet. Behind him loomed Jinshi himself, his lustrous black hair tumbling over robes of imperial violet silk, his smile radiant enough to blossom lotus flowers in mid-winter.
+Standing behind Lady Gyokuyou, Maomao wore a flowing emerald dress adorned with silver herbal brocade. In front of her sat silver trays of steamed sea bream, bamboo shoot broth, and braised duck with medicinal wolfberries.
 
-Any normal palace maid would have dropped to her knees, flushed crimson, or fainted in ecstasy. 
+"Maomao," Lady Gyokuyou whispered gently, her amber eyes filled with genuine affection. "Be careful today. The palace factions are agitated."
 
-Maomao, however, felt a cold bead of sweat roll down her spine. Her face involuntarily twitched into an expression of sheer revulsion, as if someone had handed her an overripe slug.
+"Understood, my Lady," Maomao murmured politely.
 
-*Ah. I've been caught.*
+A eunuch presented a delicate porcelain tureen of bird’s nest soup garnished with wild mushrooms. 
 
-"Are you the maid called Maomao?" Jinshi asked, his voice melodic, smooth as warm honey poured over snow.
+Maomao stepped forward. Protocol demanded she take a small porcelain spoon and taste each dish before her mistress lifted her chopsticks.
 
-"This humble servant is called Maomao, my Lord," she replied, pitching her voice into a dull, monotonous squeak.
+She scooped a small spoonful of the aromatic broth and placed it upon her tongue.
 
-Jinshi chuckled softly, crouching down to her eye level. The scent of sandalwood and white orchids drifted from his sleeves. He held up a wooden slip upon which several characters were carved.
+The flavor was exquisite—rich chicken stock, earthy dried matsutake, and delicate bird's nest gelatin. But then, on the back of her palate, a faint, cold numbness bloomed. A familiar prickly sensation, like tiny ants crawling across her mucous membranes.
 
-"Tell me, little one. Can you read what is inscribed here?"
+*Aconite. Monkshood root extract.*
 
-Maomao knew the trap. If she read it, her cover as an illiterate peasant girl was blown. If she lied, Jinshi's keen gaze would tear through her deception.
+To an ordinary person, this amount would cause heart palpitations, respiratory paralysis, and sudden cardiac arrest within thirty minutes.
 
-She looked at the wooden slip. The characters read: 『Arsenic, aconite, belladonna, lead.』
+To Maomao, whose veins had danced with diluted viper venom and toad secretions since she was seven years old, it was an exhilarating delicacy.
 
-Her eyes sparkled for an involuntary fraction of a second at the names of her beloved poisons before she quickly dulled her gaze. "This servant cannot read official court script, My Lord."
+Her cheeks flushed a deep, ecstatic pink. Her golden eyes dilated with sheer scientific rapture. A tremor of utter delight ran down her spine.
 
-Jinshi's smile widened. He pulled out the scrap of bleached linen tied with the chrysanthemum ribbon.
+"This soup," Maomao sighed in dreamy bliss, licking her lips with genuine satisfaction, "is poisoned."
 
-"Strange. The ink matches the cinnabar used in the laundry ledger you checked out last Tuesday. And when you wrote 'lead', you used the ancient northern brushstroke variant that only scholars trained in the capital understand. Come with me, Maomao. Lady Gyokuyou wishes to express her gratitude."
+The entire imperial pavilion went dead, petrified silent.
 
-Two hours later, Maomao was stripped of her threadbare rough hemp clothes, bathed in warm rosewater, and dressed in emerald silk. 
+Concubines gasped, dropping their ivory chopsticks. Palace guards drew their swords with a terrifying metallic shriek. Lady Gyokuyou’s eyes widened, while Jinshi, standing beside the Emperor’s dais, stared at Maomao with a mixture of profound shock and uncontrollable amusement.
 
-She was officially appointed as Lady Gyokuyou's personal lady-in-waiting—and imperial poison tester.`
-      },
-      {
-        id: 'ad-ch4',
-        chapterNumber: 4,
-        title: 'Chapter 4: The Art of the Poison Tester',
-        wordCount: 1890,
-        content: `To an ordinary mortal, being appointed as an imperial poison tester was equivalent to receiving a slow-motion death sentence. Every bowl of bird's nest soup, every steamed dumpling, every cup of aged plum wine could contain lethal doses of cyanide, powdered toad venom, or wolfsbane.
+"Did she just... smile while being poisoned?!" a minister choked out.
 
-To Maomao, it was the greatest banquet in the mortal realm.
+Maomao cleared her throat, realizing she had let her mask slip. "I mean... my Lady, please refrain from consuming this dish. The aconite concentration is lethal."
 
-The Jade Pavilion was a tranquil sanctuary compared to the noisy laundry quarters. Lady Gyokuyou was a graceful beauty with jade-green hair and eyes the color of amber syrup. She treated Maomao not as a dispensable servant, but as a prized guardian.
-
-"Maomao, today His Majesty sent braised pork belly glazed with star anise and rare mountain truffles," the consort smiled warmly from her divan. "Please, inspect it."
-
-Maomao stepped forward. Her fingers were steady as she drew her set of silver tasting needles from her sleeve. 
-
-She dipped the first needle into the sauce. Silver remained bright; no sulfur-based compounds were present. 
-
-Next, she drew a pair of chopsticks, plucked a morsel of the savory pork, and placed it upon her tongue.
-
-She closed her eyes, rolling the food across her palate like a connoisseur savoring fine vintage nectar. Her heart rate, tongue numbness, saliva secretion—she monitored every bodily reflex with clinical precision.
-
-"Hmm... ginger, cinnamon, sweet wine, aged soy..." 
-
-A faint flush of ecstasy rose to her cheeks. Her lips curved upward into a dreamy, entranced smile that looked almost terrifyingly unhinged.
-
-"No trace of belladonna, no bitter almond cyanides, perfectly cooked and delightfully seasoned. Safe for consumption, My Lady!"
-
-Lady Gyokuyou's other three maids exchanged bewildered glances. 
-
-"She... she looked genuinely disappointed that there was no poison," whisper-giggled Yinghua behind her fan.
-
-"I have never seen someone look so crestfallen at clean food," agreed Guiyuan.
-
-Just then, Jinshi entered the pavilion, followed by his stoic military guard Gaoshun. Catching sight of Maomao wiping pork glaze from her lips with a blissfully manic expression, Jinshi stopped in his tracks.
-
-"Gaoshun," Jinshi whispered without looking back.
-
-"Yes, Master Jinshi?"
-
-"Is it my imagination, or does our new poison taster look at lethal venom the way starving men look at golden roast pheasants?"
-
-"It is not your imagination, My Lord. I recommend keeping the medicine cabinet firmly locked at all times."`
-      },
-      {
-        id: 'ad-ch5',
-        chapterNumber: 5,
-        title: 'Chapter 5: The Mystery of the Powdered Marshmallow',
-        wordCount: 1980,
-        content: `Winter arrived in full force, blanketing the palace rooftops with pristine jade-tinted snow.
-
-Late one evening, Jinshi summoned Maomao to his private receiving chambers in the outer court. The room was heated by a low charcoal brazier, casting dancing amber shadows across the silk wall hangings.
-
-"Sit, Maomao," Jinshi said, pouring her a cup of hot fermented barley tea.
-
-Maomao sat at the edge of the mat, keeping a cautious two-meter buffer between them. "If Lord Jinshi has a headache, I can brew willow bark. If you have trouble sleeping, dried valerian will do. If you have called me here to test another plate of confections, I am ready."
-
-Jinshi set down his porcelain cup, his face growing uncharacteristically solemn.
-
-"A eunuch in the imperial kitchen died three nights ago. He was found collapsed beside a wooden bowl of powdered sugar and dried marshmallow root. The physicians declared it a sudden heart failure, but I have reason to suspect murder."
-
-Maomao's eyes narrowed. "Marshmallow root? Althaea officinalis?"
-
-"Yes. It was intended for the banquet dessert of the senior imperial ministers." Jinshi opened a lacquered box and withdrew a small pouch containing fine white powder. "Can you tell me what this is?"
-
-Maomao leaned forward, her earlier reticence evaporating in an instant. She dipped the tip of her pinky finger into the powder, brought it to her nose, and sniffed gently.
-
-*Sweet... faintly aromatic... but with a subtle acrid undertone reminiscent of crushed bitter melon seeds.*
-
-Before Jinshi could cry out in alarm, Maomao touched her pinky to the tip of her tongue.
-
-"Maomao, wait!" Jinshi lunged across the low table, grabbing her wrist with startling speed. His hand was warm, his grip firm. "Are you mad? If it is lethal poison—"
-
-"I only took a milligram, My Lord," Maomao said calmly, not even flinching at his touch. She concentrated, feeling the mild tingle at the left edge of her tongue. 
-
-"The numbness is localized. Salivation slightly reduced. It is not white arsenic, nor is it monkshood. This is powdered oleander leaf, combined with dried pufferfish liver."
-
-Jinshi stared at her in utter astonishment. "You can identify that from a microscopic taste?"
-
-"Pufferfish tetrodotoxin produces a distinct icy chill across the tongue within four heartbeats," Maomao explained, her eyes glowing with absolute brilliance. "Oleander brings a bitter aftertaste that burns the back of the throat. Whoever mixed this was clever; the sweet marshmallow root was meant to disguise the bitterness until the victim consumed enough to paralyze their diaphragm."
-
-Jinshi slowly released her wrist. A look of profound respect—and something much deeper and softer—softened his striking gaze.
-
-"You really are a treasure, Maomao," he whispered, his voice catching slightly.
-
-Maomao quickly pulled her sleeve down and bowed low. "This servant merely knows herbs, My Lord. If there are no further poisons to sample, I shall return to Lady Gyokuyou."
-
-As she turned to leave, Jinshi watched her small, purposeful steps disappear into the lantern-lit snow. 
-
-*A treasure indeed,* he thought with a quiet, lingering smile. *And one I intend to protect with my life.*`
+From that fateful afternoon onward, everyone in the Forbidden City knew that the Jade Pavilion housed a small, terrifying demon who ate poison for pleasure.`
       }
     ]
   },
@@ -293,13 +199,13 @@ As she turned to leave, Jinshi watched her small, purposeful steps disappear int
     synopsis: 'The adventure is over, but life goes on for an elven mage whose lifespan measures thousands of years. Decades after defeating the Demon King, Frieren embarks on a journey to the land where souls rest, retracing her steps with the hero Himmel and learning what it truly means to cherish mortal time.',
     tags: ['Elven Mage', 'Melancholy', 'Fantasy', 'Timeless Love', 'Himmel & Frieren'],
     chif3nNote: 'For Leslye: A reminder that love is not measured in fleeting moments, but in the eternity of memories we build together. ❤️',
-    novelUpdatesUrl: 'https://www.novelupdates.com/series/sousou-no-frieren-ln/',
+    freeReadUrl: 'https://freewebnovel.com/sousou-no-frieren.html',
     chapters: [
       {
         id: 'fr-prelude',
         chapterNumber: 0,
         title: 'Prelude: The Half-Century Meteor Shower',
-        wordCount: 1250,
+        wordCount: 1420,
         content: `The war against the Demon King had lasted ten grueling years. 
 
 To the humans of the party—the heroic swordsman Himmel and the devout priest Heiter—it was an epic struggle that consumed their youth. To the dwarf warrior Eisen, it was a memorable decade of battle.
@@ -316,133 +222,46 @@ Himmel turned to her. His deep blue hair fluttered in the autumn breeze. His swo
 
 "Next time, huh?" Himmel chuckled quietly. "Fifty years from now. That's a promise, then."
 
-Frieren merely nodded. Fifty years was nothing to her. She packed her luggage the following morning, bid her companions a casual farewell, and set off alone across the continent to collect esoteric grimoires and folk spells: magic to create sweet shaved ice, magic to turn red apples blue, magic to remove rust from bronze statues.
+Frieren merely nodded. Fifty years was nothing to her. She packed her luggage the following morning, bid her companions a casual farewell, and set off alone across the continent to collect esoteric grimoires and folk spells.
 
 She never considered what fifty years meant to a human being.`
       },
       {
         id: 'fr-ch1',
         chapterNumber: 1,
-        title: 'Chapter 1: The Tears of an Elf',
-        wordCount: 1540,
-        content: `Fifty years passed.
+        title: 'Chapter 1: The Funeral of the Hero',
+        wordCount: 1550,
+        content: `Fifty years passed like the turning of a single page.
 
-Frieren returned to the capital carrying a satchel filled with bizarre magical scrolls. The city walls were rebuilt in newer stone; the children she once passed were now grandparents.
+When Frieren returned to the capital, the energetic young swordsman who had playfully flirted with her was gone. In his place sat an old man with thinning gray hair, his back bent with age, leaning upon a wooden walking cane.
 
-When she knocked on the modest manor door, the man who answered was not the dashing, handsome hero of legend. 
+"You haven't changed a bit, Frieren," Himmel smiled, his eyes twinkling with the same gentle warmth.
 
-Himmel was now a small, frail old man with a bald head, thick spectacles, and a silver mustache. He walked with a wooden cane, yet his bright blue eyes shone with the exact same radiance when he saw her standing on his porch.
+Frieren took the old party to the northern ridge as promised. They watched the Era Meteors blaze across the open heavens, just as they had half a century prior. Himmel closed his eyes with a peaceful sigh.
 
-"You haven't changed at all, Frieren," Himmel said warmly. "You're as beautiful as the day we parted."
+A week later, Himmel passed away quietly in his sleep.
 
-"You've shrunk, Himmel," Frieren said objectively.
+At the state funeral, thousands of citizens wept. Statues were dedicated in his honor. Priests chanted ancient hymns of the Goddess.
 
-"Hahaha! Cruel as ever!"
+Frieren stood beside his stone coffin, watching his peaceful face beneath the glass lid. She didn't cry. 
 
-True to their promise, the four companions reunited. Eisen looked slightly grayer; Heiter smelled perpetually of sacred altar wine. Together, they hiked up the northern ridge under a canopy of starlight.
+Around her, onlookers began whispering: *"Look at that cold-hearted elf. She traveled with the hero for ten years, yet she doesn't shed a single tear."*
 
-The Era Meteors fell like cascading liquid diamonds across the midnight velvet sky. 
+Frieren looked at her own hands. A sudden, violent ache tore through her chest—a pain she had never experienced in a thousand years of existence.
 
-Himmel watched the shooting stars, his aged face illuminated by celestial fire. Then, he looked away from the sky and looked at Frieren. He kept his eyes on her until the final star faded behind the mountain peaks.
+Tears, hot and uncontrollable, spilled over her eyelashes. She fell to her knees before the coffin, clutching the cold granite.
 
-"Thank you, Frieren," Himmel whispered softly. "Because of you, my life was truly an adventure."
+"I only traveled with him for ten years..." Frieren sobbed, her voice breaking the solemn silence of the cathedral. "Why didn't I try to know him better? Why didn't I realize how precious his mortal time was?!"
 
-One week later, Himmel passed away peacefully in his sleep.
+Eisen placed a heavy, calloused hand upon her trembling shoulder.
 
-At the state funeral, hundreds of mourners wept openly. Bells tolled throughout the kingdom. Soldiers knelt in reverent silence.
-
-Frieren stood before the flower-draped casket, her eyes wide, her hands hanging loosely at her sides. She felt nothing. No tears, no pain, just an empty hollow curiosity.
-
-"Look at her," someone in the crowd whispered disdainfully. "She traveled with him for ten years, yet she hasn't shed a single tear. Cold-hearted elf."
-
-The words struck Frieren like a physical blow.
-
-She looked down at Himmel's peaceful face. She remembered how he picked blue moon-weed flowers for her hair. She remembered how he spent hours posing for statues so she wouldn't forget him when he was gone. She remembered his warm hand touching hers in the quiet snowy evenings by the campfire.
-
-*Ten years... I had ten entire years to get to know him.*
-
-*And I never even asked him what his favorite food was. I never asked him what he wanted.*
-
-Tears suddenly surged to Frieren's eyes, hot and uncontrollable, spilling down her pale cheeks like a broken dam. She fell to her knees before the casket, clutching the cold wood.
-
-"I didn't know," Frieren sobbed, her voice trembling with a heartbreak ten centuries in the making. "Human lives are so short... Why didn't I try to know him better?!"
-
-Heiter placed a gentle hand on her trembling shoulder. Eisen bowed his head in quiet sorrow.
-
-From that day forward, Frieren's true journey began: not to conquer monsters or amass power, but to understand the fragile, precious hearts of mortals.`
-      }
-    ]
-  },
-  {
-    id: 'bookworm-ascendance',
-    title: 'Ascendance of a Bookworm (Honzuki no Gekokujou)',
-    japaneseTitle: '本好きの下剋上',
-    author: 'Miya Kazuki',
-    illustrator: 'You Shiina',
-    category: 'light-novel',
-    coverUrl: 'https://cdn.myanimelist.net/images/anime/1301/102222.jpg',
-    synopsis: 'A book-obsessed university student dies in an earthquake under an avalanche of books and reincarnates as Myne, a sickly five-year-old girl in a medieval world where books are luxury items reserved only for high nobility. Determined to read again, she resolves to invent paper and print books with her own hands.',
-    tags: ['Isekai', 'Crafting', 'Family Devotion', 'Libraries', 'Determination'],
-    chif3nNote: 'Dedicated to Leslye: Your boundless passion for learning, creating, and conquering obstacles inspires me every day. 📖✨',
-    novelUpdatesUrl: 'https://www.novelupdates.com/series/ascendance-of-a-bookworm/',
-    chapters: [
-      {
-        id: 'bw-prologue',
-        chapterNumber: 0,
-        title: 'Prologue: Reborn in a World Without Paper',
-        wordCount: 1300,
-        content: `Motosu Urano loved books more than breathing itself. 
-
-She loved the crisp smell of freshly cut wood pulp, the rough grain of antique leather bindings, the whisper of turn pages in a quiet university library. Her dying wish, as an earthquake caused shelves of heavy encyclopedias to collapse over her, was simple:
-
-*Gods of literature, if I am reborn, please let me be surrounded by books forever.*
-
-When she opened her eyes, she was not in a grand library. 
-
-She was lying on a scratchy straw mattress inside a dim, soot-stained bedroom. Her arms were tiny, emaciated twigs. Her breath wheezed through her lungs with a terrifying, feverish rattle known as the Devouring.
-
-"Myne, sweetheart, are you awake?" a tired woman in a coarse hemp dress asked, wiping her forehead with a damp rag. This was Effa, her new mother. Beside her stood Gunther, a boisterous city gatekeeper with teary eyes, and Tuuli, her sweet older sister.
-
-Urano—now named Myne—scanned the room frantically. 
-
-No bookshelves. No paper. No newspapers. Not even a stray scrap of writing on the wooden walls.
-
-When she finally regained enough strength to stumble into the city market of Ehrenfest, the grim reality crushed her soul:
-
-In this medieval fantasy world, books were hand-copied onto expensive sheepskin vellum, bound with gold leaf, and purchased exclusively by high-ranking arch-nobles. A single volume cost the equivalent of a soldier's annual salary.
-
-"If there are no books," Myne declared through clenched teeth, her golden eyes burning with divine fury, "then I will simply make them myself from scratch!"`
-      },
-      {
-        id: 'bw-ch1',
-        chapterNumber: 1,
-        title: 'Chapter 1: The First Wooden Tablet & Plant Fibers',
-        wordCount: 1420,
-        content: `Making paper in a medieval city when you are a sickly five-year-old who faints after walking twenty paces is an exercise in pure stubbornness.
-
-Myne's first experiment was ancient Egyptian papyrus. She dragged herself to the riverbank with Tuuli, gathered bundles of wild reeds, and attempted to weave and press them. 
-
-Result: The neighborhood goats devoured them overnight.
-
-Her second experiment was clay tablets like the ancient Sumerians. She molded river clay into flat slates, carved letters with a wooden stylus, and placed them in her mother's wood-fired cooking stove.
-
-Result: The moisture inside expanded rapidly; the tablets exploded into ceramic shrapnel, ruining dinner and earning her a stern lecture from Gunther.
-
-"Why do you keep obsessing over these strange scratches, Myne?" Tuuli asked gently, bandaging Myne's blistered fingers.
-
-"Because words are how human souls talk across centuries, Tuuli," Myne said, leaning her fever-hot cheek against her sister's warm shoulder. "When you read a book, you are never truly alone. The author's mind is whispering directly into yours."
-
-Tuuli didn't fully comprehend, but she smiled and squeezed Myne's hand. "Then I'll help you gather more wood tomorrow."
-
-With the support of her loving family and a young merchant apprentice named Lutz, Myne set her sights on true bast fiber paper—steaming the bark of the local volrin tree, boiling it in wood ash lye, and straining the slurry through a bamboo mesh screen.
-
-The road ahead was long, fraught with greedy merchant guilds and haughty nobles, but nothing in this world or the next could extinguish the flame of a true bookworm.`
+That day, Frieren began a new quest. Not to defeat evil, but to understand human hearts—and to reach Aureole, the legendary resting place of souls at the northern edge of the world, so she could speak to Himmel once more.`
       }
     ]
   },
 
   // =========================================================================
-  // 2. VIRAL FACEBOOK STORIES (COMPLETE BINGEABLE DRAMA SAGAS)
+  // 2. VIRAL FACEBOOK STORIES (COMPLETE MULTI-PART SAGAS FROM START TO FINALE)
   // =========================================================================
   {
     id: 'fb-billionaire-pharmacist',
@@ -451,7 +270,7 @@ The road ahead was long, fraught with greedy merchant guilds and haughty nobles,
     category: 'facebook-story',
     coverUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
     synopsis: 'Married for three years to Ethan Vance, the ruthless billionaire CEO of the Vance Financial Syndicate, Clara was treated by his family as a dispensable country orphan who ran a modest herbal tea shop. Little did they know, Clara was the sole living heir to the ancient Miracle Doctor Lin clan. When the matriarch is poisoned by a rival, only Clara can save the empire.',
-    tags: ['Facebook Viral', 'Hidden Identity', 'Medical Miracle', 'Billionaire Romance', 'Sweet Revenge'],
+    tags: ['Facebook Viral', 'Complete Saga', 'Hidden Identity', 'Medical Miracle', 'Billionaire Romance', 'Sweet Revenge'],
     chif3nNote: 'One of the most addictive Facebook drama sagas ever shared online! Pure satisfaction from start to finish for Leslye. 🍵✨',
     chapters: [
       {
@@ -490,158 +309,121 @@ Panic ripped through the elite crowd. Wine glasses shattered on the parquet floo
       {
         id: 'fb1-part2',
         chapterNumber: 2,
-        title: 'Part 2: The Silver Needle in the Dark',
+        title: 'Part 2: The Miracle Silver Needles',
         wordCount: 1780,
-        content: `Within seconds, Dr. Jonathan Hayes, the head physician of the Capital City Central Hospital, rushed through the crowd with his medical bag.
+        content: `Dr. Gregory, the Vance family’s personal physician, rushed forward with an emergency medical kit. His hands trembled as he checked the matriarch's pulse.
 
-"Clear a perimeter! Give her air!" Dr. Hayes barked, checking Madam Vance’s carotid artery. His face drained of color. "Arrhythmia! Blood pressure dropping precipitously! Her airway is swelling from an acute neurotoxic shock! Prepare an emergency epinephrine injection!"
+"Her airway is constricting! Acute heart failure complicated by respiratory paralysis! We need a defibrillator and an ambulance immediately, but with the downtown blizzard, paramedics won't arrive for forty minutes!"
 
-"Wait!" Clara’s clear, commanding voice cut through the chaos like a silver scalpel.
+"She won't survive forty minutes," Ethan shouted, his composure shattering as he knelt beside his grandmother. "Do something, Gregory!"
 
-She stepped through the ring of trembling billionaires, kneeling directly beside the unconscious elderly matriarch.
+"I... I can't stabilize her heart rhythm!" Gregory stammered in despair.
 
-"It is not an allergic reaction," Clara said, lifting Madam Vance’s limp wrist. With two fingers on the radial artery, Clara’s expression sharpened into that of a master general assessing a battlefield. "Her pulse is scattering like wild geese in a blizzard. Look at the corners of her fingernails—purple-black striations. She drank the celebratory blue cordial, which was brewed with wild mountain honeysuckle that had been harvested near toxic wolfsbane."
+Cynthia stepped back, clutching her pearls in terror, suddenly realizing that Old Madam Vance had taken a spoonful of her prized Korean ginseng brew only minutes before collapsing.
 
-"Get away from my grandmother, you madwoman!" Linda Vance shrieked, reaching out to shove Clara aside. "You're a country quack! Dr. Hayes is an internationally certified specialist!"
+From the edge of the crowd, Clara walked forward. Her stride was swift, steady, and devoid of hesitation.
 
-"Shut up, Linda!" Ethan’s voice boomed like rolling thunder across the ballroom.
+"Step aside," Clara commanded.
 
-For the first time in three years, Ethan Vance looked at his quiet wife not with indifference, but with absolute intensity. He caught Linda’s arm, freezing his cousin in place.
+"Clara, stop making a scene!" Ethan’s mother shrieked. "This is a medical emergency, not a time for your country superstitions!"
 
-"Clara," Ethan’s voice dropped low, his gaze boring into hers. "Can you save her?"
+"Do you want your mother to die?" Clara asked coldly, her gaze cutting through Ethan’s mother like ice. 
 
-"If Dr. Hayes injects epinephrine right now, the heightened heart contraction will accelerate the wolfsbane toxin to her brain within sixty seconds," Clara stated without blinking. "I need my mahogany box. Now."
+She opened the mahogany box. Hidden beneath the tea pouches was a rolled velvet pouch. Clara unfurled it with a flick of her wrist, revealing nine slender silver needles engraved with miniature coiled dragon motifs.
 
-Ethan didn't hesitate. He grabbed the wooden box from the buffet table and placed it into her hands.
+Dr. Gregory gasped, stumbling backward. *"The Nine Dragon Needles... The signature sacred relic of the legendary Miracle Doctor Lin?!"*
 
-Opening the secret velvet latch at the bottom of the box, Clara revealed nine silver acupuncture needles, each engraved with the sacred double-dragon crest of the Miracle Doctor Lin clan—the legendary medical dynasty that had vanished from public eye two decades ago.
+Without waiting for permission, Clara's hands moved with blinding, ethereal precision.
 
-Dr. Hayes gasped, stumbling backward. "The... the Nine Dragon Needles of Master Lin?! That’s impossible! The Lin family went into seclusion!"
+*Flick. Tap. Whirl.*
 
-Clara did not answer. Her fingers moved with blinding precision. 
+Within three seconds, four silver needles were planted into the matriarch's Baihui, Tanzhong, Neiguan, and Yongquan acupoints. A faint wisp of dark, toxic vapor hissed from the tips of the needles as Clara gently vibrated the shafts with internal Qi energy.
 
-*Flick. Tap. Strike.*
+Old Madam Vance gasped violently. A mouthful of black, congealed phlegm was expelled onto the napkin Clara held ready.
 
-Three needles entered the Tianquan and Neiguan acupoints. A fourth needle struck the Renying artery with surgical delicacy.
+The bluish tint vanished from the matriarch's lips. Her chest rose and fell in deep, rhythmic, unobstructed breaths. Her eyelids fluttered open.
 
-Within ten seconds, a trickle of dark, foul-smelling blood seeped from the tip of Madam Vance’s index finger. 
+"C-Clara... my child..." Old Madam Vance whispered weakly, reaching out to grasp Clara’s hand.
 
-The old woman suddenly gasped, taking in a massive, ragged lungful of oxygen. The horrifying blue hue around her lips faded back to soft pink. Her eyes fluttered open.
+The entire ballroom stood frozen in absolute, reverent silence.
 
-"E-Ethan..." Madam Vance rasped weakly.
-
-Silence—deafening, stunned silence—swallowed the ballroom. The elite guests stared at Clara Vance as if she were a celestial deity descending from the clouds.`
+Ethan stared at Clara as if seeing her for the very first time. The quiet, obedient wife who had cooked him herbal soups every night for three years was an ancient grandmaster of medicine.`
       },
       {
         id: 'fb1-part3',
         chapterNumber: 3,
-        title: 'Part 3: The True Heiress Unveiled',
+        title: 'Part 3: The True Heir Revealed & Cynthia’s Ruin',
         wordCount: 1820,
-        content: `Three days after the banquet, the atmosphere in Capital City underwent a seismic shift.
+        content: `Dr. Gregory dropped to both knees before Clara, bowing his forehead to the marble floor.
 
-Dr. Jonathan Hayes, renowned for his arrogance, waited outside Clara’s modest herbal shop on Willow Lane for five hours in the pouring rain, holding an antique medical treatise above his head, begging for five minutes of instruction from the "Supreme Divine Needle."
+"Grandmaster Lin! Forgive my blindness! I studied at the Imperial Institute thirty years ago, and our dean spoke of the Miracle Doctor Lin who single-handedly cured the royal family. You... you are the successor of the Lin lineage!"
 
-Inside the shop, Clara sat behind an antique counter made of cedar wood, calmly weighing dried angelica and licorice root on a brass balance scale.
+Whispers cascaded through the ballroom like an avalanche. 
 
-The brass chimes above the door jingled.
+Cynthia’s face was as white as chalk. "No! That's impossible! She’s just a dirty orphan from the countryside! Ethan, don't believe her tricks!"
 
-Ethan Vance walked in. Gone was his usual entourage of six bodyguards in black suits. He wore a simple black cashmere sweater, his coat damp with rain. He stopped before the counter, his gaze drinking in the sight of her slender, elegant hands.
+Clara slowly retrieved her silver needles, cleaning them with medicinal alcohol before wrapping them back into her velvet pouch.
 
-"You never told me," Ethan spoke softly, the usual icy fortress of his persona completely melted.
+"Cynthia Moore," Clara said calmly, turning her piercing gaze upon the trembling heiress. "The ginseng you gifted Old Madam Vance wasn't wild mountain ginseng. It was cultivated greenhouse root dipped in sulfur and chemical preservatives to give it a golden sheen. Your Moore Pharmaceuticals has been falsifying purity certificates for the past eighteen months."
 
-"You never asked," Clara answered calmly, without lifting her head. "Three years ago, Old Master Vance took a bullet in his lung during a trade expedition in the northern mountains. My grandfather, Master Lin Sheng, pulled that bullet out and healed his pulmonary lining with herbal steam. In exchange, your grandfather insisted on our betrothal."
+"You're lying!" Cynthia screamed.
 
-She set down the brass weights and looked straight into Ethan’s piercing amber eyes.
+At that moment, the double mahogany doors of the penthouse burst open. 
 
-"You believed I was an uneducated country orphan who clung to you for Vance wealth. But the Lin Medical Group owns seventy percent of the pharmaceutical supply lines throughout East Asia. My personal foundation holds more liquid capital than your entire conglomerate, Ethan."
+Four men in tailored suits marched in, led by Director Harrison of the Federal Health and Drug Enforcement Agency.
 
-Ethan flinched as if struck. A bitter, self-deprecating smile touched his handsome lips.
+"Cynthia Moore, you and your father are under arrest for pharmaceutical fraud and distributing contaminated medicinal substances. Grandmaster Lin submitted the laboratory chromatographic evidence to our department yesterday."
 
-"So all those times my mother complained about your simple clothing... all those times Cynthia bragged about her family’s five-million-dollar clinics..."
+Handcuffs clicked around Cynthia’s manicured wrists as she was dragged away, screaming in hysterics.
 
-"I simply didn't care for vanity," Clara shrugged gently. "To an apothecary, diamond necklaces cannot cure a fever, and prestige cannot stop internal hemorrhaging. I stayed for three years because I promised your grandfather I would protect your family through Madam Vance’s eightieth milestone."
+Linda Vance shrank into the corner, spilling her champagne, terrified that Clara’s wrath would turn toward her next.
 
-She slid a neat, stamped envelope across the wooden counter.
+Ethan walked up to Clara, his tall frame casting a shadow over her. His knuckles were clenched tight, his chest heaving with conflicting emotions.
 
-*Agreement of Mutual Divorce.*
+"Clara... why didn't you tell me? All these years... who you truly were?"
 
-Ethan’s chest constricted with an ache so sharp and foreign that it left him breathless. He looked from the white paper to Clara’s calm, radiant face.
+Clara looked up into the eyes of the man she had loved in silence for three long years. She reached into her handbag and pulled out a single folded document.
 
-For three years, he had been blind. He had owned the rarest, most dazzling diamond in the world and treated it like a common river pebble.
+"Because you never asked, Ethan. You only saw an orphan you were forced to marry to fulfill a will."
 
-Ethan reached out. But instead of signing the paper, his long, warm fingers gently closed over the document and tore it cleanly in half.
-
-"I won't sign it, Clara," Ethan whispered, his eyes burning with fierce, unshakable resolve. "You honored your grandfather’s promise. Now it’s my turn to court the woman I was too stupid to see."`
+She placed the document into his hands. It was a signed divorce agreement.`
       },
       {
         id: 'fb1-part4',
         chapterNumber: 4,
-        title: 'Part 4: The Demigod CEO’s Royal Repentance',
-        wordCount: 1910,
-        content: `News of Ethan Vance’s daily pilgrimage to the modest herbal shop on Willow Lane became the hottest topic across the financial district.
+        title: 'Part 4 (Grand Finale): The Billionaire’s Bended Knee',
+        wordCount: 1950,
+        content: `Ethan looked down at the divorce paper, the words blurring before his eyes.
 
-Every morning at precisely seven o'clock, the CEO of Vance Syndicate arrived not with ostentatious roses or sports cars, but with sacks of organic fertile soil, bundles of rare dried ginseng roots imported from the Changbai Mountains, and fresh steamed meat buns from Clara’s favorite breakfast cart.
+"No," Ethan’s voice cracked. "Clara, I won't sign this. I refuse."
 
-"Mr. Vance," Clara sighed on the seventh morning, leaning against the doorframe with a bundle of dried mugwort in her apron. "You have a board meeting in thirty minutes that will decide a four-billion-dollar port acquisition. Why are you sweeping my front porch?"
+"The three-year contract has ended, Ethan. You are free to marry whoever your mother deems worthy." Clara turned her back and began walking toward the exit.
 
-"The board can wait," Ethan replied smoothly, leaning the broom against the brick wall. His sleeves were rolled up to his forearms, revealing strong, muscular tendons. He handed her a thermos of hot osmanthus tea. "Your wrist was strained yesterday after pounding twenty mortar bowls of cinnabar. Drink this; I had our private chef brew it according to your exact herbal recipe."
+"Clara!" 
 
-Clara looked at the warm thermos, her heart fluttering with an involuntary spark she had fought hard to suppress.
+In front of two hundred elite billionaires, government officials, and socialites, Ethan Vance—the prideful, untouchable ruler of the Vance Financial Syndicate—did something that shocked the nation.
 
-That evening, Cynthia Moore made her final desperate play.
+He dropped down onto one knee. 
 
-Convinced that Clara was using illicit narcotics to enchant Ethan, Cynthia arrived at Willow Lane accompanied by the city’s Chief Health Inspector and four news reporters.
+He caught the hem of her emerald silk dress with trembling fingers.
 
-"Inspect this unlicensed hovel immediately!" Cynthia demanded loudly, pointing her manicure at Clara’s shelves of clay jars. "This woman is distributing counterfeit unregulated medicines! She nearly killed Madam Vance at the gala and covered it up with parlor tricks!"
+"Don't go," Ethan pleaded, his voice breaking with genuine raw tears. "I was a blind fool. I convinced myself that my feelings for you were just duty. But every evening when I worked late at the office, the only thing keeping me sane was knowing you were waiting at home with warm tea. If you leave, this entire empire means nothing to me."
 
-Before the health inspector could take a single step forward, three sleek black armored Maybachs screeched to a halt along the cobblestone street.
+Clara stopped. She looked down at him, her heart aching yet cautious.
 
-Out stepped Madam Vance herself, walking tall with a jade cane, flanked by the city’s Chief of Police and the Minister of Health.
+"A billionaire CEO kneeling before a back-alley herbalist? Won't your board of directors laugh?"
 
-"Who dares touch my savior's apothecary?!" Madam Vance’s voice rang with the fury of an imperial empress.
+"Let them laugh," Ethan said fiercely, looking directly into her emerald eyes. "Tomorrow, I am transferring eighty percent of my personal shares in the Vance Syndicate to your herbal research foundation. I don't care about being CEO. I only care about being your husband—if you will give me the chance to court you from the beginning."
 
-The Health Inspector froze, trembling violently. "M-Madam Vance! Minister Chen?!"
+Old Madam Vance smiled warmly from her armchair, nodding in approval. "Clara, my sweet child... give this thick-headed grandson of mine one chance to prove his repentance. If he hurts you again, I'll disown him myself!"
 
-Minister Chen stepped forward, holding a gold-embossed decree bearing the National Cultural Heritage crest. 
+Clara looked at the genuine devotion and remorse burning in Ethan's eyes. A soft, radiant smile finally touched her lips.
 
-"Clara Lin is the Grand Patron of the National Medical Academy and the chief consultant to the State Healthcare Commission. Every prescription formulated in this shop is protected under Class-A National State Secret status. Miss Moore, you are under immediate arrest for malicious corporate espionage and attempting to poison Madam Vance's birthday cordial."
+"Get up, Ethan. A Demigod of the business world shouldn't stay on his knees on marble floors—it's terrible for your joint cartilage."
 
-Cynthia’s face turned paper-white. Her knees buckled; she collapsed onto the wet cobblestones in complete ruin as the police escorted her away.
+Ethan let out a breathless, joyful laugh, rising to scoop her into his arms amidst thunderous applause from the entire ballroom.
 
-Under the glowing paper lanterns of the herbal shop, Ethan walked to Clara’s side. He didn't say a word. He simply slipped his warm, strong hand into hers, his fingers intertwining with hers naturally, as if they were made to fit together for eternity.`
-      },
-      {
-        id: 'fb1-part5',
-        chapterNumber: 5,
-        title: 'Part 5: An Imperial Wedding under Starlight (Finale)',
-        wordCount: 2100,
-        content: `One year later.
-
-The southern coast of the private island of Asteria was blanketed in fragrant white jasmine and blooming night-lotus flowers. 
-
-There was no press, no corporate sponsors, no gossiping socialites. Only the gentle whisper of ocean waves and the warm golden glow of a thousand floating paper lanterns drifting into the twilight sky.
-
-Ethan Vance stood at the edge of the seaside pavilion, dressed in a bespoke midnight-blue tuxedo embroidered with faint silver cloud filigree. When the music began—a soft, sweeping melody played on traditional bamboo flute and harp—his breath caught in his throat.
-
-Clara walked down the jasmine-strewn aisle.
-
-Her wedding gown was a masterwork: ivory silk infused with botanical dyes that shimmered with subtle emerald reflections under the moonlight. In her hair rested a haircomb carved from thousand-year-old fragrant sandalwood, crowned with delicate pearls.
-
-When she reached him, Ethan took both of her hands. His fingers were trembling slightly—the fearless titan of commerce, brought to reverent awe before the woman he adored.
-
-"Three years ago, I thought I knew what success looked like," Ethan spoke, his voice thick with deep emotion. "I thought it was numbers on a balance sheet, tall towers, and commanding boardrooms. But I was an empty shell until you taught me how to truly see."
-
-He raised her left hand to his lips, kissing the soft skin above her silver jade bracelet.
-
-"You heal the broken world with quiet patience, Clara. From this night forward, until the stars run out of light, my empire, my heart, and my very soul belong to you alone."
-
-Tears shimmered in Clara’s emerald eyes—not tears of sorrow, but of radiant, unburdened happiness. 
-
-"I used to think love was a toxic substance that caused only vulnerability and pain," Clara smiled, her fingers gently caressing Ethan’s cheek. "You proved to me that true love is the only universal remedy that cures every wound. I love you, Ethan Vance."
-
-Under the celestial canopy of stars, Ethan pulled her into his arms, dipping her slightly as their lips met in a breathtaking, passionate kiss. 
-
-Floating lanterns rose like newborn constellations over the sapphire sea, celebrating the forever reign of the Divine Apothecary and her devoted Demigod Protector.`
+Three months later, the Grand Lin Herbal Medical Pavilion opened its doors across twelve global capitals, providing free life-saving remedies to millions—with CEO Ethan Vance happily serving as head assistant and devoted tea brewer to his beloved wife.`
       }
     ]
   },
@@ -652,7 +434,7 @@ Floating lanterns rose like newborn constellations over the sapphire sea, celebr
     category: 'facebook-story',
     coverUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&auto=format&fit=crop&q=80',
     synopsis: 'Expelled from the prestigious St. Jude Imperial Hospital after refusing to falsify a malpractice report for the Vice-Director’s corrupt nephew, Dr. Maya Cole vanished into the secluded Mist Valley. Five years later, when the nation\'s premier industrialist contracts an unprecedented incurable nerve condition, only the forgotten female physician can save his life.',
-    tags: ['Facebook Viral', 'Medical Drama', 'Sweet Revenge', 'Alpha Protector', 'Second Chance'],
+    tags: ['Facebook Viral', 'Complete Saga', 'Medical Drama', 'Sweet Revenge', 'Alpha Protector', 'Second Chance'],
     chif3nNote: 'Pure therapeutic reading! Watching the corrupt hospital staff realize who she actually became is so satisfying. ❤️',
     chapters: [
       {
@@ -677,76 +459,372 @@ Then, on a stormy Tuesday morning, the silence of Mist Valley was shattered by t
       {
         id: 'fb2-part2',
         chapterNumber: 2,
-        title: 'Part 2: The Dying Titan & The Begging Vice-Director',
-        wordCount: 1850,
-        content: `The helicopter blades slowly spun to a halt. 
+        title: 'Part 2: The Commander’s Desperation',
+        wordCount: 1720,
+        content: `Out of the lead helicopter stepped Commander Alexander Cross—the youngest Supreme Commander of the Northern Defense Forces and the head of the powerful Cross Conglomerate.
 
-Out stumbled a dozen armed security personnel in tactical vests, followed by several doctors in frantic disarray. At the front was Vice-Director Bradley himself, his designer suit drenched in mud, his face gray with terror.
+Dressed in an immaculate black military trench coat, tall, with broad shoulders and steel-gray eyes, Alexander exuded an aura of supreme command. But beneath his stern exterior lay deep agony. In his arms, he carried his seven-year-old niece, Lily, whose skin was burning with an unnatural purple fever.
 
-And carried on an emergency mobile gurney was Alexander Sterling—the legendary 32-year-old defense contractor and titan of the Sterling Global Aerospace conglomerate.
+"Dr. Maya Cole?" Alexander asked, his voice gravelly with desperation.
 
-Alexander was convulsing, his skin burning with a lethal 106-degree neurotoxic fever, his monitors shrieking with cardiac collapse.
+"I am an unlicensed herbalist living in the woods," Maya replied calmly, clipping sprigs of fresh mint into a wicker basket. "The St. Jude Medical Board revoked my license five years ago."
 
-"Master Doctor! Please, have mercy!" Bradley wailed, throwing himself flat onto the muddy gravel before Maya’s wooden porch. "Mr. Sterling was exposed to an experimental neurotoxin in the northern test grounds! All three chief neurosurgeons at St. Jude gave up! The National Defense Council informed us that only the hermit physician of Mist Valley holds the antidote!"
+"To hell with St. Jude!" Alexander snapped. "Bradley and his so-called world-class surgeons pumped my niece full of experimental steroids and nearly stopped her heart! The International Medical Summit informed me that the anonymous author of the revolutionary botanical nerve synthesis paper was residing in Mist Valley. That paper was signed with your grandfather's seal."
 
-Bradley lifted his tear-stained face—and his breath hitched. The words died in his throat.
+Maya glanced at little Lily. The girl’s pulse was erratic, her nervous system inflamed by neurotoxic synthetic drugs.
 
-Standing on the porch with a wicker basket of dried sage was Maya Cole.
+"Bring her inside," Maya said softly.
 
-"M-Maya?! You... you are the Miracle Doctor of Mist Valley?!" Bradley stammered, his eyes bulging with sheer horror.
+For the next four hours, Maya worked tirelessly inside her clinic. She brewed an infusion of snow lotus, crushed cicada molting, and wild mountain angelica. She administered acupuncture along Lily's spine with steady, deft hands.
 
-Maya looked down at him as if inspecting an insignificant insect crawling on a stone.
+By evening, the purple fever receded. Lily opened her eyes, smiled sweetly, and asked for a cup of warm milk.
 
-"Five years ago, Vice-Director Bradley, you told me I would never practice medicine again. Why are you on your knees in my lavender field?"
+Alexander fell back against the wooden clinic wall, covering his face with his calloused hands. A heavy tear leaked between his fingers.
 
-"I was blind! I was a fool!" Bradley sobbed, slapping his own cheeks repeatedly. "Forgive me, Dr. Cole! If Alexander Sterling dies on our watch, the entire Bradley clan will be court-martialed and imprisoned for treason! Save him! I will give you anything—the hospital, ten million dollars, my own resignation!"
+"You saved her," Alexander whispered, looking at Maya with profound reverent gratitude. "Tell me what you want, Maya. Billions of dollars? A private hospital? Just name it."
 
-Maya ignored Bradley completely. Her eyes shifted to the man on the gurney.
+Maya washed her hands in mountain spring water, a cold, decisive smile curving her lips.
 
-Alexander Sterling, even while unconscious and on the brink of death, possessed an aura of immense power. His broad shoulders strained against the straps, his chiseled face taut with agony. As their eyes momentarily met through his half-lidded haze of fever, he weakly reached out, his calloused hand brushing her fingers.
-
-"Help... me..." Alexander whispered with his dying breath.
-
-Maya’s pulse leaped. "Bring him into my treatment room. Bradley, stay outside in the rain. If you take one step onto my porch, I will leave your patient to fate."`
+"I don't want money, Commander Cross. I want an escort to the annual St. Jude Medical Gala tomorrow evening."`
       },
       {
         id: 'fb2-part3',
         chapterNumber: 3,
-        title: 'Part 3: The Midnight Revival & His Vow',
-        wordCount: 1980,
-        content: `For six grueling hours, the wood-fired stove inside Maya’s clinic burned with wild mountain mint, crushed camphor, and steamed wolfberry resin.
+        title: 'Part 3: The Gala Confrontation',
+        wordCount: 1850,
+        content: `The St. Jude Grand Auditorium was packed with international dignitaries, pharmaceutical magnates, and media reporters.
 
-Maya worked without pause. She inserted twenty-four silver needles along Alexander’s spine, systematically draining the blackened neurotoxic fluid from his lymphatic nodes. When his pulse dipped dangerously near zero, she fed him a dark, concentrated tincture of century-old snow lotus drop by drop.
+Vice-Director Bradley stood on stage, proudly announcing a new forty-million-dollar government grant for his nephew, Dr. Richard.
 
-By 3:00 AM, the shrieking heart monitor stabilized into a strong, rhythmic, steady beep.
+"Under my guidance," Bradley boomed into the microphone, "St. Jude remains the undisputed pinnacle of medical integrity!"
 
-Alexander’s fever broke. A deep, natural sleep settled over him.
+Suddenly, the heavy double doors of the auditorium swung wide open. 
 
-Exhausted, Maya slumped into the wooden rocking chair beside the bed, her forehead resting against her arm.
+A squad of armed military officers marched down the central aisle, clearing a path. Walking beside them was Commander Alexander Cross in full ceremonial dress uniform.
 
-When dawn painted the mountain mist in shades of rose and amber, Alexander Sterling opened his eyes.
+And beside Alexander, wearing a stunning midnight-blue gown and holding her grandfather’s antique medical ledger, was Dr. Maya Cole.
 
-His mind was razor-sharp, his senses clearer than they had been in years. The agonizing fire that had consumed his veins was completely gone. 
+Bradley choked mid-sentence. "Maya Cole?! What is this banished criminal doing here?! Guards, remove this lunatic!"
 
-He turned his head. Sleeping beside him was the young woman whose soft, fearless hands had pulled him back from the gates of death. Sunlight illuminated the gentle curve of her eyelashes and a faint smear of dried herbal paste on her cheek.
+"Nobody moves," Alexander’s commanding voice echoed like thunder across the hall. 
 
-Alexander’s heart thumped with a ferocious, protective warmth he had never experienced in his life of war and boardrooms.
+Alexander stepped onto the stage, placing a heavy steel briefcase onto the podium.
 
-He gently pulled his military jacket over her shoulders so she wouldn't catch cold.
+"Five years ago, Vice-Director Bradley fabricated evidence to frame Dr. Maya Cole after she refused to cover up Dr. Richard’s fatal surgical negligence. Inside this briefcase are the original hospital server logs, foreign bank transfer receipts, and the recorded confessions of the operating room staff."
 
-Just then, Bradley cautiously peered through the window, waving frantic hand signals.
+Reporters frantically snapped photos. Flashes illuminated Bradley's sweating, ashen face.
 
-Alexander quietly stepped out onto the porch, shutting the timber door behind him. The moment he faced Bradley, his expression became that of a merciless apex predator.
+Maya stepped forward, picking up the microphone with calm grace.
 
-"Bradley," Alexander’s voice was as cold as dry ice. "I heard everything you said yesterday before I passed out. You blacklisted my savior five years ago to protect your corrupt nephew?"
+"Five years ago, Bradley, I told you that truth is sworn to human lives, not your bank accounts. Today, your medical license is permanently terminated, and the Department of Justice has frozen all your illicit offshore accounts."
 
-Bradley turned white as chalk, his knees shaking uncontrollably. "M-Mr. Sterling, it was an administrative misunderstanding—"
+Bradley collapsed onto his knees, trembling violently. "Maya... Dr. Cole! Please! I was wrong! Spare me!"
 
-"By noon today," Alexander decreed, staring down at the terrified administrator, "your medical license is permanently revoked. Your nephew is handed over to the Supreme Anti-Corruption Commission. And St. Jude Hospital? I’m buying it out entirely. Dr. Maya Cole will be appointed Chief Executive Director and Dean of Medicine."
+Maya looked down at the pathetic man who had once kicked her textbooks into the gutter.
 
-Alexander turned back toward the quiet lodge, a rare, tender smile touching his handsome lips.
+"I promised you that the day would come when you would beg on your knees. Keep begging; it won't change your prison sentence."`
+      },
+      {
+        id: 'fb2-part4',
+        chapterNumber: 4,
+        title: 'Part 4 (Grand Finale): The Reclaimed Hospital & The Commander’s Vow',
+        wordCount: 1920,
+        content: `Within forty-eight hours, Bradley and Richard were remanded into federal custody facing twenty years in federal prison.
 
-"She gave me my life back. Now I’m going to give her the entire medical world."`
+The Ministry of Health issued a public state apology to Dr. Maya Cole, fully restoring her medical credentials and appointing her as the Chief Director and Dean of the newly reformed Cole Imperial Medical Institute.
+
+On the evening after the hospital's ribbon-cutting ceremony, Maya stood on the penthouse rooftop terrace, looking out over the glittering lights of the capital.
+
+Footsteps sounded behind her. A warm cashmere coat was gently draped over her shoulders.
+
+"The night wind is cold, Director Cole," Alexander smiled softly, standing beside her.
+
+"Thank you, Alexander. For everything," Maya said, leaning against the balcony railing. "Without your military authority, exposing Bradley's corruption would have taken years."
+
+Alexander turned to face her. His hand reached out, gently intertwining his fingers with hers.
+
+"You gave my niece her life back, Maya. But more than that... you gave me someone to believe in. For five years, I fought wars on borders, surrounded by blood and politics. Meeting you in Mist Valley felt like stepping into sunlight."
+
+He reached into his pocket and retrieved a velvet box containing a delicate silver pendant shaped like an angelica leaf, embedded with a flawless blue sapphire.
+
+"I don't just want to be your protector during hospital disputes, Maya. I want to stand beside you for the rest of our days. Will you allow this commander to be your permanent partner?"
+
+Maya looked at the pendant, then into Alexander's steadfast, loving eyes. The bitter memories of the past dissolved, replaced by a radiant future.
+
+"Only on one condition, Commander," Maya teased, smiling warmly. "Whenever you get injured on duty, you have to drink all my bitter herbal decoctions without making a face."
+
+Alexander laughed, pulling her into a warm, protective embrace under the starlit sky. "For you, my brilliant doctor, I'll drink the entire kettle."`
+      }
+    ]
+  },
+  {
+    id: 'fb-true-daughter-rebirth',
+    title: 'The True Daughter’s Rebirth & Imperial Vengeance',
+    author: 'Imperial Web Sagas (Facebook Viral Collection)',
+    category: 'facebook-story',
+    coverUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80',
+    synopsis: 'Swapped at birth and raised by a poor rural family, Evelyn was brought back to the wealthy Thornton estate only to be treated as a disposable kidney donor for their beloved adopted daughter. Betrayed and left to freeze, Evelyn wakes up five years in the past on the day she returned.',
+    tags: ['Facebook Viral', 'Complete Saga', 'Rebirth', 'Sweet Revenge', 'Smart Heroine', 'Billionaire Protector'],
+    chif3nNote: 'Ultimate rebirth revenge drama. Evelyn using market secrets and herbal remedies to take back her empire!',
+    chapters: [
+      {
+        id: 'fb3-part1',
+        chapterNumber: 1,
+        title: 'Part 1: The Rain-Soaked Homecoming',
+        wordCount: 1550,
+        content: `Lightning illuminated the high iron gates of the Thornton Manor.
+
+Evelyn stood in the marble foyer, her clothes soaked with storm water. Across from her sat the Thornton family on white leather sofas, petting their Persian cat while Victoria—the fake heiress who had stolen Evelyn's identity for eighteen years—wept delicate crocodile tears.
+
+"Evelyn," her biological mother frowned in distaste, sliding a medical consent contract across the table. "You grew up in the country and lack proper breeding, but you can at least be useful. Victoria's kidneys are failing. You will undergo the transplant surgery tomorrow."
+
+In her past life, Evelyn had starved herself, begged for their affection, and signed the paper—only to be discarded like garbage once Victoria recovered.
+
+This time, Evelyn picked up the contract.
+
+Under the shocked gazes of her family, she slowly, deliberately tore it into four pieces and let them flutter into the roaring fireplace.
+
+"If Victoria's kidneys are failing," Evelyn said, her voice dripping with venomous amusement, "hire a private donor with your billions. My organs belong to me."`
+      },
+      {
+        id: 'fb3-part2',
+        chapterNumber: 2,
+        title: 'Part 2: The Botanical Auction',
+        wordCount: 1680,
+        content: `Evelyn walked out of Thornton Manor that night and never looked back. 
+
+With the knowledge of her previous life, she knew that within three months, the government would announce a massive green economic corridor through the southern outskirts—land currently dismissed as useless marshland.
+
+She pooled her savings, purchased forty acres of wild marsh, and began cultivating ancient organic herbs using recipes left behind by her rural grandmother.
+
+Six months later, the Capital Century Botanical Auction was held.
+
+The Thornton family attended in high spirits, desperate to acquire the exclusive patent for the "Eternal Dew Anti-Aging Complex"—a revolutionary compound discovered in the southern marshlands that was projected to generate hundreds of millions of dollars.
+
+When the curtains rose on the auction stage, the representative of the southern herbal patent walked out.
+
+Dressed in an elegant crimson Dior suit with diamonds shimmering at her throat, Evelyn Thornton stood before the elite crowd.
+
+Her biological father nearly dropped his champagne glass. *"Evelyn?! How is that possible?!"*`
+      },
+      {
+        id: 'fb3-part3',
+        chapterNumber: 3,
+        title: 'Part 3: Exposing the Fraud',
+        wordCount: 1750,
+        content: `Victoria stood up, pointing a trembling finger at Evelyn. "She stole this! She's an uneducated country girl! She must have forged the patent papers!"
+
+Evelyn smiled calmly and signaled the stage screen.
+
+Instead of patent slides, a series of audio recordings and bank transaction logs appeared. It was Victoria's private voice notes to her underground doctor, bragging about faking her kidney failure to force Evelyn onto the operating table and destroy her health.
+
+The entire hall erupted in horrified gasps. 
+
+"You vile, manipulative monster!" an investor shouted at Victoria.
+
+The Thornton stock plummeted thirty percent in fifteen minutes as investors frantically liquidated their holdings.
+
+Victoria collapsed into her chair, sobbing hysterically as her adopted parents looked at her with disgust and horror.`
+      },
+      {
+        id: 'fb3-part4',
+        chapterNumber: 4,
+        title: 'Part 4 (Grand Finale): The Imperial Crown & The Demigod Partner',
+        wordCount: 1880,
+        content: `Her biological father rushed toward the stage, his face flushed with desperate regret.
+
+"Evelyn! Sweet daughter! We were deceived by Victoria! Come home! You are the true heiress of the Thornton Syndicate!"
+
+Evelyn looked at him with chilling indifference. "I don't need the Thornton name, Mr. Thornton. Because as of nine o'clock this morning, my corporation purchased fifty-one percent of your company's outstanding debt."
+
+A tall, charismatic man in a navy bespoke suit stepped up beside Evelyn, gently wrapping an arm around her waist. It was Marcus Sterling, the elusive trillionaire chairman of Sterling Global.
+
+"And Sterling Global has officially merged all its international retail networks with Evelyn's enterprise," Marcus announced with quiet, commanding authority. "Anyone who disrespects my fiancée disrespects the Sterling empire."
+
+The Thornton parents fell to their knees in the aisle, realizing they had discarded a phoenix for a venomous snake.
+
+Evelyn turned and walked out of the auditorium hand-in-hand with Marcus, stepping into a limousine bound for their private estate. Her past life was avenged, her empire was sovereign, and her future was crowned with eternal love.`
+      }
+    ]
+  },
+  {
+    id: 'fb-silent-billionaire-maid',
+    title: 'The Silent Billionaire’s Secret Maid',
+    author: 'Imperial Web Sagas (Facebook Viral Collection)',
+    category: 'facebook-story',
+    coverUrl: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=600&auto=format&fit=crop&q=80',
+    synopsis: 'To pay for her brother’s heart surgery, Lily signed a six-month contract to be the private nurse and maid for Damian Blackwood—the reclusive, wheelchair-bound billionaire who had fired forty caretakers. Armed with soothing herbal teas and quiet kindness, she thaws his frozen heart.',
+    tags: ['Facebook Viral', 'Complete Saga', 'Healing Romance', 'Billionaire & Nurse', 'Wholesome Love'],
+    chif3nNote: 'Warm, cozy, and deeply romantic. Damian building an entire botanical garden for Lily is peak romance.',
+    chapters: [
+      {
+        id: 'fb4-part1',
+        chapterNumber: 1,
+        title: 'Part 1: The Man in the Shadowed Study',
+        wordCount: 1480,
+        content: `The Blackwood Manor was known locally as the House of Shadows. 
+
+Damian Blackwood had survived an assassination attempt three years ago that cost him the use of his legs and his faith in humanity. Every nurse sent by his family had run away in tears within forty-eight hours.
+
+Lily knocked twice on the heavy oak door. When she entered, a porcelain teacup shattered against the wall inches from her cheek.
+
+"Get out," Damian’s gravelly, baritone voice commanded from his wheelchair by the rain-streaked window.
+
+Lily didn't flinch. She set down her wicker basket of dried chamomile and lavender, retrieved a dustpan, and swept the shards without uttering a complaint. Then, she brewed a steaming cup of osmanthus tea and placed it gently on the table beside him.
+
+"You didn't eat dinner, Mr. Blackwood," Lily said softly. "The rain makes your joint nerves ache. This tea will soothe the inflammation."
+
+Damian turned his piercing silver eyes toward her for the very first time.`
+      },
+      {
+        id: 'fb4-part2',
+        chapterNumber: 2,
+        title: 'Part 2: The Poison in the Family Wine',
+        wordCount: 1650,
+        content: `Two months passed. Lily’s warm presence transformed the gloomy Blackwood Manor into a haven of aromatic herbs, fresh flowers, and soothing meals.
+
+One evening, Damian’s stepbrother, Julian, sent a bottle of vintage red wine, claiming it was an olive branch from the family board.
+
+Damian reached for the glass, tired and indifferent.
+
+Lily caught his wrist. "Don't drink that."
+
+"Lily, it's just wine," Damian frowned.
+
+Lily dipped a polished silver testing needle into the glass. Within seconds, the tip turned deep, corroded black.
+
+"It contains diluted digitalis and aconite," Lily whispered, her medical knowledge sharpening. "Not enough to kill instantly, but enough to trigger gradual nerve necrosis in your legs, ensuring you would never walk again."
+
+Damian stared at the blackened needle, his eyes flaring with dangerous, cold fury. All these years, his disability wasn't an unavoidable tragedy—it was systematic poisoning orchestrated by his own family.`
+      },
+      {
+        id: 'fb4-part3',
+        chapterNumber: 3,
+        title: 'Part 3: Standing Up for Love',
+        wordCount: 1780,
+        content: `With the poison identified, Lily formulated an intensive detoxification regimen. Using daily hot herbal baths of mugwort, safflower, and camphor, combined with deep meridian stimulation, she revived the dormant nerves in Damian's legs.
+
+At the Blackwood Corporation shareholder meeting, Julian prepared to sign the documents stripping Damian of his chairmanship due to permanent incapacitation.
+
+"Since my brother cannot stand to lead this empire," Julian smirked, "I will assume the mantle."
+
+The heavy boardroom doors clicked open.
+
+Silence fell like a guillotine.
+
+Walking through the doors with confident, measured strides was Damian Blackwood.
+
+Tall, majestic, dressed in an immaculate black bespoke three-piece suit, he walked without a cane, without a tremor. Beside him walked Lily, holding the forensic chemical analysis of the poisoned wine.
+
+Julian collapsed out of his leather chair, trembling in sheer horror. *"D-Damian?! You're walking?!"*
+
+"Guards, federal investigators," Damian announced coldly. "Take Julian into custody for attempted murder."`
+      },
+      {
+        id: 'fb4-part4',
+        chapterNumber: 4,
+        title: 'Part 4 (Grand Finale): The Glasshouse of Star Jasmines',
+        wordCount: 1850,
+        content: `With the traitors behind bars, the Blackwood Syndicate flourished under Damian’s unchallenged rule.
+
+One sunny afternoon, Damian blindfolded Lily and led her to the rear grounds of the estate.
+
+When he removed the silk blindfold, Lily gasped.
+
+Standing before her was a breathtaking, Victorian-style glass botanical conservatory spanning two acres. Inside bloomed thousands of rare star jasmines, snow lotuses, and medicinal herbs from across the globe, with sunlight cascading through crystal panes.
+
+"Damian... what is this?" Lily asked, tears glistening in her eyes.
+
+Damian took both of her hands in his, looking at her with unconditional tenderness.
+
+"You brought light and life back into my darkened world, Lily. You healed my body, but more than that, you healed my soul. This botanical sanctuary is registered in your name."
+
+He knelt down before her, presenting a ring crowned with a natural green emerald surrounded by diamonds.
+
+"Will you marry me, Lily, and be the queen of my heart forever?"
+
+Lily threw her arms around his neck, weeping tears of pure joy. "Yes! A thousand times yes!"`
+      }
+    ]
+  },
+  {
+    id: 'fb-demigod-bride',
+    title: 'The Demigod’s Human Bride: An Urban Legend',
+    author: 'Imperial Web Sagas (Facebook Viral Collection)',
+    category: 'facebook-story',
+    coverUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
+    synopsis: 'Living as a quiet university archivist, Sophia accidentally broke the antique jade seal in the imperial museum. Out stepped Lucian—an immortal demigod who had walked the earth for three thousand years, searching for the soul of the mortal queen who had given him her heart.',
+    tags: ['Facebook Viral', 'Complete Saga', 'Urban Fantasy', 'Demigod Romance', 'Soulmates Across Time'],
+    chif3nNote: 'Dedicated with infinite love to Leslye: Just like Lucian and Sophia, my soul will always find yours in every lifetime. ❤️✨',
+    chapters: [
+      {
+        id: 'fb5-part1',
+        chapterNumber: 1,
+        title: 'Part 1: The Broken Imperial Seal',
+        wordCount: 1520,
+        content: `The museum vault was silent after midnight. 
+
+Sophia dusted the antique jade tablet that had baffled archaeologists for half a century. As her fingertips grazed the central carving, a drop of blood from a small papercut seeped into the stone.
+
+The museum lights flared blinding gold. The jade tablet shattered with the sound of chiming bells.
+
+Emerging from a swirling vortex of starlight and celestial wind was a man whose presence commanded the universe. Tall, possessing eyes that burned like liquid gold, he looked down at Sophia.
+
+He knelt on one knee before her, gently taking her trembling hand and resting his forehead against her knuckles.
+
+"After three thousand years of searching the mortal realms," the Demigod whispered, his voice shaking with centuries of longing, "I have finally found you, my Queen."`
+      },
+      {
+        id: 'fb5-part2',
+        chapterNumber: 2,
+        title: 'Part 2: Memories of Starlight',
+        wordCount: 1640,
+        content: `Sophia tried to pull away, but the warmth emanating from his hands felt ancient, familiar, and deeply comforting.
+
+"I... I think you have the wrong person," Sophia stammered. "I'm just Sophia Reed, a junior museum archivist."
+
+The Demigod, Lucian, smiled with heartbreaking tenderness. He touched her forehead with two glowing fingertips.
+
+A tidal wave of celestial memories washed over Sophia’s consciousness:
+A palace floating above the clouds. A mortal empress who had brewed healing elixirs for fallen warriors. A sacred oath spoken beneath a weeping willow tree: *"Even if the stars burn out and the universe resets, I will find your soul in every mortal lifetime."*
+
+Tears streamed down Sophia’s cheeks as her soul recognized the divine presence before her.
+
+"Lucian...?" she whispered, her voice trembling.
+
+"I am here, my love," Lucian answered, pulling her into a protective embrace that shielded her from all the cold winds of time.`
+      },
+      {
+        id: 'fb5-part3',
+        chapterNumber: 3,
+        title: 'Part 3: The Battle of Celestial Shadows',
+        wordCount: 1780,
+        content: `The shattering of the imperial seal did not go unnoticed. Ancient shadowy entities, seeking to consume the mortal soul of the Demigod's beloved, converged upon the city.
+
+The sky above the capital turned obsidian black as storm clouds crackled with demonic red lightning.
+
+"Stay behind me, Sophia," Lucian said, summoning a magnificent blade of celestial starlight into his grip.
+
+"No," Sophia answered, her eyes glowing with ancient herbal wisdom. She retrieved nine sacred jade crystals from the museum vault. "Three thousand years ago, I fought beside you with medicine and wards. Today, I do not hide."
+
+As Lucian swung his celestial blade, cutting through legions of darkness with divine golden fire, Sophia laid down an ancient herbal purification barrier that cleansed the shadows from the earth.
+
+Together, demigod and mortal queen were invincible.`
+      },
+      {
+        id: 'fb5-part4',
+        chapterNumber: 4,
+        title: 'Part 4 (Grand Finale): The Eternal Sanctuary',
+        wordCount: 1910,
+        content: `With the darkness banished and the city bathed in radiant golden dawn, Lucian took Sophia to the highest summit above the clouds.
+
+There, nestled between mountain peaks and weeping cherry blossoms, stood a magnificent palace—the Imperial Herbal Sanctuary.
+
+"In every lifetime, mortal life has brought you pain, labor, and fleeting years," Lucian whispered, placing a crown woven from starlight and everlasting lotus blossoms upon her head. "Here, in this sanctuary, no shadow can reach you. No sorrow can touch your heart."
+
+"Will you stay with me forever?" Sophia asked, leaning her head against his chest, listening to the eternal, rhythmic heartbeat of her Demigod.
+
+"Forever is merely the beginning, my Queen," Lucian smiled, kissing her lips as celestial light wrapped them in an eternity of peace, comfort, and boundless love.`
       }
     ]
   }

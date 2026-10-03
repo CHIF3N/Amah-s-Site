@@ -20,17 +20,20 @@ import {
   Layers,
   FolderOpen,
   Globe,
-  Share2
+  Share2,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  Search,
+  ArrowLeft,
+  ArrowRight,
+  BookMarked
 } from 'lucide-react';
-import * as pdfjsLib from 'pdfjs-dist';
+import { Document, Page, pdfjs } from 'react-pdf';
 import { PRELOADED_NOVELS, CuratedNovel, NovelChapter } from '../data/novels';
 
-// Configure pdfjs worker to reliable CDN
-try {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-} catch (e) {
-  console.warn('PDF worker setup:', e);
-}
+// Set up pdfjs worker from verified cdn
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 type ReaderTheme = 'parchment' | 'candlelight' | 'tearoom';
 type NovelCategory = 'all' | 'light-novel' | 'facebook-story' | 'imported';
@@ -83,7 +86,10 @@ export const NovelReader: React.FC = () => {
     return PRELOADED_NOVELS;
   });
 
+  // Library vs Reader viewMode: default to library so the user can browse all different novels!
+  const [isReading, setIsReading] = useState<boolean>(false);
   const [activeCategory, setActiveCategory] = useState<NovelCategory>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedNovelId, setSelectedNovelId] = useState<string>('apothecary-diaries');
   const [activeChapterIndex, setActiveChapterIndex] = useState<number>(0);
   const [chapterDrawerOpen, setChapterDrawerOpen] = useState<boolean>(false);
@@ -91,6 +97,12 @@ export const NovelReader: React.FC = () => {
   const [bookmarkSavedNotice, setBookmarkSavedNotice] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isImporting, setIsImporting] = useState<boolean>(false);
+
+  // react-pdf State for Client-Side PDF Novel Rendering
+  const [pdfFile, setPdfFile] = useState<File | string | null>(null);
+  const [numPdfPages, setNumPdfPages] = useState<number | null>(null);
+  const [currentPdfPage, setCurrentPdfPage] = useState<number>(1);
+  const [pdfScale, setPdfScale] = useState<number>(1.1);
 
   // Settings
   const [settings, setSettings] = useState<ReaderSettings>(() => {
@@ -109,37 +121,78 @@ export const NovelReader: React.FC = () => {
   const contentContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Filter novels by category
+  // Filter novels by category and search query
   const filteredNovels = novels.filter((n) => {
-    if (activeCategory === 'all') return true;
-    if (activeCategory === 'imported') return n.id.startsWith('custom-') || n.category === 'imported';
-    return n.category === activeCategory;
+    // Category match
+    const matchesCategory =
+      activeCategory === 'all'
+        ? true
+        : activeCategory === 'imported'
+        ? n.id.startsWith('custom-') || n.category === 'imported'
+        : n.category === activeCategory;
+
+    if (!matchesCategory) return false;
+
+    // Search query match
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      n.title.toLowerCase().includes(q) ||
+      (n.japaneseTitle && n.japaneseTitle.toLowerCase().includes(q)) ||
+      n.author.toLowerCase().includes(q) ||
+      n.synopsis.toLowerCase().includes(q) ||
+      n.tags.some((t) => t.toLowerCase().includes(q))
+    );
   });
 
-  const currentNovel = novels.find((n) => n.id === selectedNovelId) || filteredNovels[0] || novels[0];
+  const currentNovel = novels.find((n) => n.id === selectedNovelId) || novels[0];
   const chapters = currentNovel?.chapters || [];
   const currentChapter = chapters[activeChapterIndex] || chapters[0];
   const currentTheme = THEME_STYLES[settings.theme];
 
-  // Load bookmark on novel select
-  useEffect(() => {
-    if (!currentNovel) return;
+  // Open a specific novel into the reading chamber
+  const handleOpenNovel = (novelId: string, chapterIdx = 0) => {
+    setSelectedNovelId(novelId);
+    const target = novels.find((n) => n.id === novelId);
+
+    // If it's a PDF novel, setup PDF
+    if (novelId.startsWith('custom-pdf-')) {
+      // PDF stays active
+    } else {
+      setPdfFile(null);
+    }
+
+    // Load saved bookmark
     try {
-      const savedProgress = localStorage.getItem(`leslye_bookmark_${currentNovel.id}`);
+      const savedProgress = localStorage.getItem(`leslye_bookmark_${novelId}`);
       if (savedProgress) {
         const parsed = JSON.parse(savedProgress);
-        if (typeof parsed.chapterIndex === 'number' && parsed.chapterIndex < (currentNovel.chapters?.length || 0)) {
+        if (typeof parsed.chapterIndex === 'number' && parsed.chapterIndex < (target?.chapters?.length || 0)) {
           setActiveChapterIndex(parsed.chapterIndex);
+        } else {
+          setActiveChapterIndex(chapterIdx);
         }
       } else {
-        setActiveChapterIndex(0);
+        setActiveChapterIndex(chapterIdx);
       }
-    } catch (e) {}
-  }, [currentNovel?.id]);
+    } catch (e) {
+      setActiveChapterIndex(chapterIdx);
+    }
 
-  // Restore scroll position
+    setIsReading(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Return to the Library / Shelf
+  const handleBackToLibrary = () => {
+    setIsReading(false);
+    setIsFullscreen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Restore scroll position when reading
   useEffect(() => {
-    if (!currentNovel) return;
+    if (!currentNovel || pdfFile || !isReading) return;
     try {
       const savedProgress = localStorage.getItem(`leslye_bookmark_${currentNovel.id}`);
       if (savedProgress) {
@@ -153,11 +206,11 @@ export const NovelReader: React.FC = () => {
         }
       }
     } catch (e) {}
-  }, [activeChapterIndex, currentNovel?.id]);
+  }, [activeChapterIndex, currentNovel?.id, pdfFile, isReading]);
 
   // Auto-save scroll position
   const handleScroll = () => {
-    if (!contentContainerRef.current || !currentNovel) return;
+    if (!contentContainerRef.current || !currentNovel || pdfFile) return;
     const scrollTop = contentContainerRef.current.scrollTop;
     try {
       localStorage.setItem(
@@ -173,18 +226,24 @@ export const NovelReader: React.FC = () => {
 
   // Explicit bookmark save button
   const handleSaveBookmark = () => {
-    if (!contentContainerRef.current || !currentNovel) return;
-    const scrollTop = contentContainerRef.current.scrollTop;
-    try {
-      localStorage.setItem(
-        `leslye_bookmark_${currentNovel.id}`,
-        JSON.stringify({
-          chapterIndex: activeChapterIndex,
-          scrollTop,
-          timestamp: Date.now()
-        })
-      );
-    } catch (e) {}
+    if (!currentNovel) return;
+    if (pdfFile) {
+      try {
+        localStorage.setItem(`leslye_pdf_page_${currentNovel.id}`, currentPdfPage.toString());
+      } catch (e) {}
+    } else if (contentContainerRef.current) {
+      const scrollTop = contentContainerRef.current.scrollTop;
+      try {
+        localStorage.setItem(
+          `leslye_bookmark_${currentNovel.id}`,
+          JSON.stringify({
+            chapterIndex: activeChapterIndex,
+            scrollTop,
+            timestamp: Date.now()
+          })
+        );
+      } catch (e) {}
+    }
 
     setBookmarkSavedNotice(true);
     setTimeout(() => setBookmarkSavedNotice(false), 3500);
@@ -197,7 +256,7 @@ export const NovelReader: React.FC = () => {
     } catch (e) {}
   }, [settings]);
 
-  // Multi-Format File Import (.PDF, .TXT, .EPUB, .MD)
+  // Multi-Format File Upload Input (.PDF, .TXT, .EPUB)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -207,591 +266,811 @@ export const NovelReader: React.FC = () => {
     const isPdf = fileName.toLowerCase().endsWith('.pdf');
 
     try {
-      let detectedChapters: NovelChapter[] = [];
-
       if (isPdf) {
-        // PDF Extraction using pdfjs-dist
-        const arrayBuffer = await file.arrayBuffer();
-        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-        const pdf = await loadingTask.promise;
+        setPdfFile(file);
+        setCurrentPdfPage(1);
 
-        const numPages = pdf.numPages;
-        let runningText = '';
-
-        for (let i = 1; i <= numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const pageStrings = textContent.items.map((item: any) => item.str).join(' ');
-
-          if (pageStrings.trim()) {
-            detectedChapters.push({
-              id: `pdf-page-${i}`,
-              chapterNumber: i,
-              title: `Page / Section ${i}`,
-              wordCount: pageStrings.split(/\s+/).length,
-              content: pageStrings
-            });
-            runningText += `\n\n--- Page ${i} ---\n\n` + pageStrings;
-          }
-        }
-
-        if (detectedChapters.length === 0) {
-          detectedChapters = [
+        const newNovel: CuratedNovel = {
+          id: `custom-pdf-${Date.now()}`,
+          title: fileName.replace(/\.[^/.]+$/, ''),
+          author: 'Imported PDF Document',
+          category: 'imported',
+          coverUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80',
+          synopsis: `Imported PDF novel document (${(file.size / (1024 * 1024)).toFixed(1)} MB). Rendered with high-fidelity canvas.`,
+          tags: ['PDF Novel', 'Client Sanctuary', 'Uploaded'],
+          chif3nNote: 'Imported PDF novel loaded for Lady Leslye. Read with cozy comfort! 📖✨',
+          chapters: [
             {
-              id: 'pdf-fallback',
+              id: 'pdf-doc',
               chapterNumber: 1,
               title: fileName,
-              content: 'The imported PDF file is an image-scanned document with no selectable text layer. Please import text-based PDF or .txt/.epub documents.'
+              content: 'Rendering via react-pdf client-side document viewer...'
             }
-          ];
-        }
+          ]
+        };
+
+        setNovels((prev) => [newNovel, ...prev]);
+        setSelectedNovelId(newNovel.id);
+        setIsReading(true);
       } else {
-        // Standard Text / Markdown / EPUB extraction
-        const rawText = await file.text();
-        const lines = rawText.split('\n');
-        let currentCapTitle = 'Chapter 1: The First Inscription';
-        let currentCapLines: string[] = [];
-        let capCounter = 1;
+        setPdfFile(null);
+        const text = await file.text();
+        const lines = text.split('\n');
+        const title = lines[0]?.trim() || fileName.replace(/\.[^/.]+$/, '');
+        const paragraphs = lines.slice(1).join('\n').trim();
 
-        for (const line of lines) {
-          if (/^(chapter|ch\.|volume|vol\.|part|prologue|act)\b/i.test(line.trim())) {
-            if (currentCapLines.length > 0) {
-              detectedChapters.push({
-                id: `imported-ch-${capCounter}`,
-                chapterNumber: capCounter,
-                title: currentCapTitle,
-                wordCount: currentCapLines.join(' ').split(/\s+/).length,
-                content: currentCapLines.join('\n')
-              });
-              capCounter++;
-              currentCapLines = [];
+        const newNovel: CuratedNovel = {
+          id: `custom-txt-${Date.now()}`,
+          title: title.length > 50 ? title.substring(0, 50) + '...' : title,
+          author: 'Local File / Imported',
+          category: 'imported',
+          coverUrl: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=600&auto=format&fit=crop&q=80',
+          synopsis: `Custom light novel imported from local file: ${fileName}.`,
+          tags: ['Custom Import', 'Personal Vault'],
+          chif3nNote: 'Imported by Lady Leslye into our sanctuary. 🌿',
+          chapters: [
+            {
+              id: 'import-ch1',
+              chapterNumber: 1,
+              title: title,
+              content: paragraphs || 'No text content detected.'
             }
-            currentCapTitle = line.trim();
-          } else {
-            currentCapLines.push(line);
-          }
-        }
+          ]
+        };
 
-        if (currentCapLines.length > 0) {
-          detectedChapters.push({
-            id: `imported-ch-${capCounter}`,
-            chapterNumber: capCounter,
-            title: currentCapTitle,
-            wordCount: currentCapLines.join(' ').split(/\s+/).length,
-            content: currentCapLines.join('\n')
-          });
-        }
+        setNovels((prev) => [newNovel, ...prev]);
+        setSelectedNovelId(newNovel.id);
+        setActiveChapterIndex(0);
+        setIsReading(true);
       }
-
-      const newNovel: CuratedNovel = {
-        id: `custom-${Date.now()}`,
-        title: fileName.replace(/\.[^/.]+$/, ''),
-        author: isPdf ? 'Imported PDF Document' : 'Personal Imperial Archive',
-        category: 'imported',
-        coverUrl: isPdf
-          ? 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=600&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=600&auto=format&fit=crop&q=80',
-        synopsis: `Imported directly into Leslye's local reader vault (${detectedChapters.length} pages/chapters).`,
-        tags: [isPdf ? 'PDF Novel' : 'Custom Upload', 'Offline Sanctuary'],
-        chif3nNote: 'Imported into Lady Leslye\'s private library. Saved in your local browser storage for offline reading! 🌿',
-        chapters: detectedChapters
-      };
-
-      setNovels((prev) => {
-        const updated = [...prev, newNovel];
-        try {
-          const customOnly = updated.filter((n) => n.id.startsWith('custom-'));
-          localStorage.setItem('leslye_custom_novels', JSON.stringify(customOnly));
-        } catch (err) {}
-        return updated;
-      });
-
-      setSelectedNovelId(newNovel.id);
-      setActiveCategory('imported');
-      setActiveChapterIndex(0);
     } catch (err) {
       console.error('File import error:', err);
-      alert('Could not read the uploaded document. Please check the file format.');
+      alert('Could not read the document. Please try a valid .pdf or .txt file.');
     } finally {
       setIsImporting(false);
     }
   };
 
   const handleNextChapter = () => {
-    if (activeChapterIndex < chapters.length - 1) {
+    if (pdfFile) {
+      if (numPdfPages && currentPdfPage < numPdfPages) {
+        setCurrentPdfPage((prev) => prev + 1);
+      }
+    } else if (activeChapterIndex < chapters.length - 1) {
       setActiveChapterIndex((prev) => prev + 1);
       if (contentContainerRef.current) contentContainerRef.current.scrollTop = 0;
     }
   };
 
   const handlePrevChapter = () => {
-    if (activeChapterIndex > 0) {
+    if (pdfFile) {
+      if (currentPdfPage > 1) {
+        setCurrentPdfPage((prev) => prev - 1);
+      }
+    } else if (activeChapterIndex > 0) {
       setActiveChapterIndex((prev) => prev - 1);
       if (contentContainerRef.current) contentContainerRef.current.scrollTop = 0;
     }
   };
 
+  // Counts for categories
+  const lnCount = novels.filter((n) => n.category === 'light-novel').length;
+  const fbCount = novels.filter((n) => n.category === 'facebook-story').length;
+  const impCount = novels.filter((n) => n.id.startsWith('custom-') || n.category === 'imported').length;
+
   return (
-    <div className={`space-y-5 animate-in fade-in transition-colors duration-300 ${isFullscreen ? 'fixed inset-0 z-50 p-4 sm:p-6 overflow-y-auto bg-black' : ''}`}>
-      {/* Novel Selector Shelf */}
-      {!isFullscreen && (
-        <div className="space-y-4">
-          {/* Top Title & Import Row */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-900/60 pb-3">
-            <div>
-              <span className="text-[11px] font-bold text-amber-300 font-cinzel uppercase tracking-widest flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
-                <span>The Imperial Scrolls & Tomes</span>
-              </span>
-              <h2 className="text-xl sm:text-2xl font-bold text-white font-cinzel mt-0.5">
-                Cozy In-App Novel & Story Sanctuary
-              </h2>
-              <p className="text-xs text-emerald-400/80">
-                Complete unabridged chapters, viral Facebook drama sagas, and direct PDF/TXT novel imports.
-              </p>
-            </div>
+    <div className="space-y-6 animate-in fade-in transition-colors duration-300">
+      {/* Hidden File Upload Input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.txt,.epub,.md"
+        onChange={handleFileUpload}
+        className="hidden"
+        id="pdf-novel-upload-input"
+      />
 
-            <div className="flex items-center gap-2">
+      {/* ========================================================================= */}
+      {/* 1. LIBRARY VIEW: BROWSE DIFFERENT NOVELS & CLICK TO OPEN                 */}
+      {/* ========================================================================= */}
+      {!isReading && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="relative rounded-3xl p-6 sm:p-8 overflow-hidden bg-gradient-to-r from-[#06241a] via-[#04150f] to-[#120815] border border-amber-500/40 shadow-2xl">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="space-y-2 max-w-2xl">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-cinzel text-[10px] font-bold text-amber-300 uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-black/60 border border-amber-500/40 shadow-sm flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                    <span>The Imperial Library · {novels.length} Works</span>
+                  </span>
+                  <span className="text-emerald-700">·</span>
+                  <span className="text-[11px] font-mono text-emerald-400">
+                    Complete Light Novels & Facebook Drama Sagas
+                  </span>
+                </div>
+
+                <h1 className="font-cinzel text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-wide">
+                  Imperial Tomes & Story Sanctuary
+                </h1>
+
+                <p className="text-xs sm:text-sm text-emerald-200/90 leading-relaxed font-serif">
+                  Select any light novel or viral Facebook drama below to open the dedicated in-app reader chamber. You can also import your own external PDF novels anytime.
+                </p>
+              </div>
+
+              {/* Upload PDF Button */}
+              <div className="shrink-0 flex items-center gap-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isImporting}
+                  className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-black font-cinzel font-bold text-xs flex items-center gap-2 shadow-xl shadow-amber-950/60 active:scale-95 transition-all disabled:opacity-50"
+                  title="Upload external .pdf or .txt novel"
+                >
+                  <Upload className="w-4 h-4 text-black" />
+                  <span>{isImporting ? 'Reading PDF...' : 'Import PDF Novel'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Search Bar & Category Filter Pills */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#04120a] p-3 rounded-2xl border border-emerald-900/60">
+            {/* Search Input */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
               <input
-                ref={fileInputRef}
-                type="file"
-                accept=".pdf,.txt,.epub,.md"
-                onChange={handleFileUpload}
-                className="hidden"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by title, author, tag, or drama..."
+                className="w-full pl-10 pr-9 py-2 rounded-xl bg-[#020a06] border border-emerald-900/80 focus:border-amber-400 text-xs text-white placeholder-emerald-700 outline-none transition-colors"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
               <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isImporting}
-                className="px-4 py-2 rounded-xl bg-[#04140e] border border-amber-500/50 hover:border-amber-400 text-xs text-amber-300 hover:text-white font-medium flex items-center gap-2 transition-all shadow-md active:scale-95 disabled:opacity-50"
-                title="Drop external PDF, TXT, or EPUB novels into your reader"
+                onClick={() => setActiveCategory('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+                  activeCategory === 'all'
+                    ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
+                    : 'bg-[#030e08] text-emerald-300/80 border-emerald-900/80 hover:text-white'
+                }`}
               >
-                <Upload className="w-4 h-4 text-amber-400" />
-                <span>{isImporting ? 'Parsing PDF...' : 'Import Novel / PDF'}</span>
+                🌸 All Works ({novels.length})
               </button>
+
+              <button
+                onClick={() => setActiveCategory('light-novel')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+                  activeCategory === 'light-novel'
+                    ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
+                    : 'bg-[#030e08] text-emerald-300/80 border-emerald-900/80 hover:text-white'
+                }`}
+              >
+                📜 Light Novels ({lnCount})
+              </button>
+
+              <button
+                onClick={() => setActiveCategory('facebook-story')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+                  activeCategory === 'facebook-story'
+                    ? 'bg-gradient-to-r from-rose-600 to-amber-600 text-white border-rose-400 shadow-sm font-bold'
+                    : 'bg-[#030e08] text-rose-300/90 border-rose-950 hover:text-white'
+                }`}
+              >
+                📱 Facebook Stories ({fbCount})
+              </button>
+
+              {impCount > 0 && (
+                <button
+                  onClick={() => setActiveCategory('imported')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
+                    activeCategory === 'imported'
+                      ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
+                      : 'bg-[#030e08] text-emerald-300/80 border-emerald-900/80 hover:text-white'
+                  }`}
+                >
+                  📂 Uploaded ({impCount})
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Section Category Filters */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <button
-              onClick={() => setActiveCategory('all')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
-                activeCategory === 'all'
-                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
-                  : 'bg-[#05170f] text-emerald-300/80 border-emerald-900/80 hover:text-white'
-              }`}
-            >
-              🌸 All Tomes ({novels.length})
-            </button>
+          {/* Results Summary */}
+          {searchQuery && (
+            <div className="text-xs text-emerald-400/90 font-mono">
+              Found {filteredNovels.length} {filteredNovels.length === 1 ? 'tome' : 'tomes'} matching "{searchQuery}"
+            </div>
+          )}
 
-            <button
-              onClick={() => setActiveCategory('light-novel')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
-                activeCategory === 'light-novel'
-                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
-                  : 'bg-[#05170f] text-emerald-300/80 border-emerald-900/80 hover:text-white'
-              }`}
-            >
-              📜 Imperial Light Novels (Apothecary, Frieren, Bookworm)
-            </button>
-
-            <button
-              onClick={() => setActiveCategory('facebook-story')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
-                activeCategory === 'facebook-story'
-                  ? 'bg-gradient-to-r from-rose-600 to-amber-600 text-white border-rose-400 shadow-sm font-bold'
-                  : 'bg-[#05170f] text-rose-300/90 border-rose-950 hover:text-white'
-              }`}
-            >
-              📱 Viral Facebook Stories (Complete Drama Sagas)
-            </button>
-
-            <button
-              onClick={() => setActiveCategory('imported')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all border ${
-                activeCategory === 'imported'
-                  ? 'bg-emerald-600 text-white border-emerald-400 shadow-sm'
-                  : 'bg-[#05170f] text-emerald-300/80 border-emerald-900/80 hover:text-white'
-              }`}
-            >
-              📂 My Imported PDFs & Vault
-            </button>
-          </div>
-
-          {/* Horizontal Novel Card Picker */}
-          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none snap-x">
+          {/* Grid of Different Novels (Click any novel to open) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
             {filteredNovels.map((novel) => {
-              const isSelected = novel.id === selectedNovelId;
               const isFbStory = novel.category === 'facebook-story';
+              const isImported = novel.category === 'imported' || novel.id.startsWith('custom-');
+              const totalWords = novel.chapters.reduce((acc, c) => acc + (c.wordCount || 1000), 0);
 
               return (
                 <div
                   key={novel.id}
-                  onClick={() => setSelectedNovelId(novel.id)}
-                  className={`group min-w-[240px] sm:min-w-[280px] max-w-[280px] p-3 rounded-2xl border transition-all cursor-pointer shrink-0 snap-start flex gap-3 ${
-                    isSelected
-                      ? isFbStory
-                        ? 'bg-[#180e14] border-rose-400 shadow-lg shadow-rose-950/40 ring-1 ring-rose-400/40'
-                        : 'bg-[#092218] border-amber-400/80 shadow-lg shadow-amber-950/40 ring-1 ring-amber-400/30'
-                      : 'bg-[#05140e]/80 border-emerald-900/60 hover:border-emerald-600 hover:bg-[#081e15]'
+                  onClick={() => handleOpenNovel(novel.id)}
+                  className={`group relative rounded-2xl border transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer hover:-translate-y-1 hover:shadow-2xl ${
+                    isFbStory
+                      ? 'bg-[#0f070d] border-rose-950 hover:border-rose-400/80 hover:shadow-rose-950/40'
+                      : isImported
+                      ? 'bg-[#091510] border-emerald-900/80 hover:border-amber-400/80 hover:shadow-emerald-950/40'
+                      : 'bg-[#05140e] border-emerald-950 hover:border-emerald-500/80 hover:shadow-emerald-950/50'
                   }`}
                 >
-                  <div className="w-16 sm:w-20 aspect-[3/4] rounded-lg overflow-hidden bg-black shrink-0 border border-emerald-950">
-                    <img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                  </div>
-                  <div className="min-w-0 flex-1 flex flex-col justify-between py-0.5">
-                    <div>
-                      {isFbStory && (
-                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-950 border border-rose-500/50 text-rose-300 font-mono block w-fit mb-1">
-                          Complete Saga
+                  <div>
+                    {/* Top Image Banner & Badges */}
+                    <div className="relative aspect-[16/10] overflow-hidden bg-black/60">
+                      <img
+                        src={novel.coverUrl}
+                        alt={novel.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100"
+                        loading="lazy"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#05140e] via-transparent to-black/60" />
+
+                      {/* Top Badges */}
+                      <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between gap-1">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[9px] font-bold font-mono uppercase tracking-wider shadow-md ${
+                            isFbStory
+                              ? 'bg-rose-950/90 text-rose-300 border border-rose-500/50'
+                              : isImported
+                              ? 'bg-amber-950/90 text-amber-300 border border-amber-500/50'
+                              : 'bg-emerald-950/90 text-emerald-300 border border-emerald-500/50'
+                          }`}
+                        >
+                          {isFbStory ? '📱 Viral Facebook Story' : isImported ? '📂 Uploaded Tome' : '📜 Imperial Light Novel'}
+                        </span>
+
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-mono bg-black/70 text-emerald-200 border border-emerald-800">
+                          {novel.chapters.length} {novel.chapters.length === 1 ? 'Chapter' : 'Chapters'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Novel Metadata */}
+                    <div className="p-4 space-y-2.5">
+                      {novel.japaneseTitle && (
+                        <span className="text-[10px] font-serif text-emerald-400/80 block -mb-1 truncate">
+                          {novel.japaneseTitle}
                         </span>
                       )}
-                      <h4 className={`text-xs font-bold truncate font-cinzel ${isSelected ? (isFbStory ? 'text-rose-300' : 'text-amber-300') : 'text-white'}`}>
+
+                      <h3 className="font-cinzel text-base font-bold text-white group-hover:text-amber-300 transition-colors line-clamp-1">
                         {novel.title}
-                      </h4>
-                      <p className="text-[10px] text-emerald-400/70 truncate mt-0.5">{novel.author}</p>
+                      </h3>
+
+                      <div className="flex items-center gap-2 text-[11px] text-emerald-400/80 font-mono">
+                        <span>By {novel.author}</span>
+                        {novel.illustrator && (
+                          <>
+                            <span>·</span>
+                            <span className="text-zinc-500 truncate">Art: {novel.illustrator}</span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Synopsis */}
+                      <p className="font-serif text-xs text-emerald-100/70 leading-relaxed line-clamp-3">
+                        {novel.synopsis}
+                      </p>
+
+                      {/* Tags */}
+                      <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                        {novel.tags.slice(0, 3).map((tag, tIdx) => (
+                          <span
+                            key={tIdx}
+                            className="px-2 py-0.5 rounded-md text-[9px] font-mono bg-emerald-950/80 text-emerald-300 border border-emerald-800/40"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Demigod Dedication */}
+                      {novel.chif3nNote && (
+                        <div className="p-2 rounded-xl bg-black/40 border border-rose-900/30 text-[10px] text-rose-300/90 italic flex items-start gap-1.5 mt-2">
+                          <Heart className="w-3 h-3 text-rose-400 shrink-0 mt-0.5 fill-rose-400/30" />
+                          <span className="line-clamp-2">{novel.chif3nNote}</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center justify-between text-[10px] text-emerald-500/80">
-                      <span>{novel.chapters?.length || 0} Chapters</span>
-                      {isSelected && <span className="text-amber-400 font-semibold">Active Tome</span>}
-                    </div>
+                  </div>
+
+                  {/* Bottom Action Footer */}
+                  <div className="p-4 pt-2 border-t border-emerald-900/40 flex items-center justify-between gap-2">
+                    <span className="text-[10px] text-emerald-500 font-mono">
+                      ~{totalWords.toLocaleString()} words
+                    </span>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenNovel(novel.id);
+                      }}
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md group-hover:scale-105 active:scale-95 transition-all"
+                    >
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>Open Tome ➔</span>
+                    </button>
                   </div>
                 </div>
               );
             })}
           </div>
+
+          {filteredNovels.length === 0 && (
+            <div className="p-12 text-center rounded-2xl bg-[#04120a] border border-emerald-900/60 space-y-3">
+              <BookOpen className="w-8 h-8 text-emerald-500 mx-auto opacity-60" />
+              <h3 className="font-cinzel text-lg font-bold text-white">No Tomes Found</h3>
+              <p className="text-xs text-emerald-400/80 max-w-md mx-auto">
+                No stories match your current search or filter. You can upload an external PDF novel or clear the filters.
+              </p>
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setActiveCategory('all');
+                }}
+                className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold"
+              >
+                Reset Filters
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Reader Chamber Container */}
-      <div
-        className="rounded-2xl border shadow-2xl overflow-hidden transition-all duration-300 flex flex-col"
-        style={{
-          backgroundColor: currentTheme.bg,
-          borderColor: currentTheme.border
-        }}
-      >
-        {/* Top Control Bar */}
-        <div
-          className="px-4 sm:px-6 py-3 border-b flex flex-wrap items-center justify-between gap-3 text-xs"
-          style={{
-            borderColor: currentTheme.border,
-            backgroundColor: `${currentTheme.bg}f5`
-          }}
-        >
-          <div className="flex items-center gap-2 min-w-0">
+      {/* ========================================================================= */}
+      {/* 2. READING CHAMBER: DEDICATED IN-APP NOVEL READER                        */}
+      {/* ========================================================================= */}
+      {isReading && (
+        <div className={`space-y-4 ${isFullscreen ? 'fixed inset-0 z-50 p-4 sm:p-6 overflow-y-auto bg-black' : ''}`}>
+          {/* Top Bar with Back Button */}
+          <div className="flex items-center justify-between gap-3">
             <button
-              onClick={() => setChapterDrawerOpen(true)}
-              className="p-1.5 rounded-lg border hover:bg-white/5 transition-colors flex items-center gap-1.5"
-              style={{ borderColor: currentTheme.border, color: currentTheme.text }}
-              title="Chapter table of contents"
+              onClick={handleBackToLibrary}
+              className="px-4 py-2 rounded-xl bg-[#04140e] hover:bg-emerald-950 border border-emerald-700/60 hover:border-amber-400 text-amber-300 hover:text-white text-xs font-bold flex items-center gap-2 shadow-md transition-all active:scale-95 group"
             >
-              <Menu className="w-4 h-4" />
-              <span className="hidden sm:inline font-mono">Chapters ({chapters.length})</span>
+              <ArrowLeft className="w-4 h-4 text-amber-400 group-hover:-translate-x-1 transition-transform" />
+              <span className="font-cinzel">← Back to Tomes Library</span>
             </button>
 
-            <div className="truncate">
-              <span className="font-cinzel font-bold text-xs truncate block" style={{ color: currentTheme.text }}>
-                {currentNovel.title}
-              </span>
-              <span className="text-[10px] opacity-75 font-mono truncate block" style={{ color: currentTheme.text }}>
-                {currentChapter?.title || 'Chapter'}
-              </span>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="flex items-center gap-2">
-            {/* Demigod's Bookmark Button */}
-            <button
-              onClick={handleSaveBookmark}
-              className="px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-              style={{
-                borderColor: currentTheme.accent,
-                backgroundColor: `${currentTheme.accent}20`,
-                color: currentTheme.text
-              }}
-              title="Save exact position for Leslye"
-            >
-              <Bookmark className="w-3.5 h-3.5 fill-current" />
-              <span className="hidden md:inline">Save Bookmark</span>
-            </button>
-
-            {/* Reader Settings Toggle */}
-            <button
-              onClick={() => setSettingsOpen(!settingsOpen)}
-              className="p-1.5 rounded-lg border hover:bg-white/5 transition-colors"
-              style={{ borderColor: currentTheme.border, color: currentTheme.text }}
-              title="Typography & theme options"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-
-            {/* Fullscreen toggle */}
-            <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="p-1.5 rounded-lg border hover:bg-white/5 transition-colors"
-              style={{ borderColor: currentTheme.border, color: currentTheme.text }}
-              title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen Reading Mode'}
-            >
-              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
-
-            {/* External Platform Link */}
-            {(currentNovel.novelUpdatesUrl || currentNovel.externalReadUrl) && (
-              <a
-                href={currentNovel.externalReadUrl || currentNovel.novelUpdatesUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1.5 rounded-lg border hover:bg-white/5 transition-colors flex items-center gap-1"
-                style={{ borderColor: currentTheme.border, color: currentTheme.text }}
-                title="Read full series on external free platforms (NovelUpdates / J-Novel)"
-              >
-                <Globe className="w-4 h-4" />
-                <span className="hidden lg:inline text-[10px]">Read Online</span>
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* Bookmark Saved Notice Pill */}
-        {bookmarkSavedNotice && (
-          <div className="bg-emerald-950/95 border-b border-emerald-600/50 py-2 px-4 text-center text-xs text-emerald-200 flex items-center justify-center gap-2 animate-in fade-in">
-            <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="font-medium font-cinzel">
-              Demigod's Bookmark: Page saved with love for Leslye 🌿
+            <span className="text-xs font-mono text-emerald-400/80 hidden sm:inline">
+              Reading: <span className="text-white font-bold">{currentNovel.title}</span>
             </span>
           </div>
-        )}
 
-        {/* Reader Settings Floating Drawer */}
-        {settingsOpen && (
+          {/* Reader Chamber Container */}
           <div
-            className="p-4 sm:p-5 border-b text-xs space-y-4 animate-in fade-in"
+            className="rounded-2xl border shadow-2xl overflow-hidden transition-all duration-300 flex flex-col"
             style={{
-              backgroundColor: `${currentTheme.bg}f8`,
+              backgroundColor: currentTheme.bg,
               borderColor: currentTheme.border
             }}
           >
-            <div className="flex items-center justify-between">
-              <span className="font-cinzel font-bold uppercase tracking-wider text-amber-300">
-                Reading Comfort & Typography
-              </span>
-              <button onClick={() => setSettingsOpen(false)} className="text-zinc-400 hover:text-white">
-                <X className="w-4 h-4" />
+            {/* Top Control Bar inside Reader */}
+            <div
+              className="px-4 sm:px-6 py-3 border-b flex flex-wrap items-center justify-between gap-3 text-xs"
+              style={{
+                borderColor: currentTheme.border,
+                backgroundColor: `${currentTheme.bg}f5`
+              }}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {!pdfFile && (
+                  <button
+                    onClick={() => setChapterDrawerOpen(true)}
+                    className="p-1.5 rounded-lg border hover:bg-white/5 transition-colors flex items-center gap-1.5"
+                    style={{ borderColor: currentTheme.border, color: currentTheme.text }}
+                    title="Chapter table of contents"
+                  >
+                    <Menu className="w-4 h-4" />
+                    <span className="hidden sm:inline font-mono">Chapters ({chapters.length})</span>
+                  </button>
+                )}
+
+                <div className="truncate">
+                  <span className="font-cinzel font-bold text-xs truncate block" style={{ color: currentTheme.text }}>
+                    {currentNovel.title}
+                  </span>
+                  <span className="text-[10px] opacity-75 font-mono truncate block" style={{ color: currentTheme.text }}>
+                    {pdfFile ? `PDF Page ${currentPdfPage} of ${numPdfPages || '...'}` : currentChapter?.title || 'Chapter'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex items-center gap-2">
+                {/* PDF Zoom Controls if PDF is active */}
+                {pdfFile && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPdfScale((s) => Math.max(0.6, s - 0.15))}
+                      className="p-1.5 rounded-lg border hover:bg-white/5 transition-colors"
+                      style={{ borderColor: currentTheme.border, color: currentTheme.text }}
+                      title="Zoom Out"
+                    >
+                      <ZoomOut className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setPdfScale((s) => Math.min(2.0, s + 0.15))}
+                      className="p-1.5 rounded-lg border hover:bg-white/5 transition-colors"
+                      style={{ borderColor: currentTheme.border, color: currentTheme.text }}
+                      title="Zoom In"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Bookmark Button */}
+                <button
+                  onClick={handleSaveBookmark}
+                  className="px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                  style={{
+                    borderColor: currentTheme.accent,
+                    backgroundColor: `${currentTheme.accent}20`,
+                    color: currentTheme.text
+                  }}
+                  title="Save exact position for Leslye"
+                >
+                  <Bookmark className="w-3.5 h-3.5 fill-current" />
+                  <span className="hidden md:inline">Save Bookmark</span>
+                </button>
+
+                {/* Reader Settings Toggle */}
+                <button
+                  onClick={() => setSettingsOpen(!settingsOpen)}
+                  className="p-1.5 rounded-lg border hover:bg-white/5 transition-colors"
+                  style={{ borderColor: currentTheme.border, color: currentTheme.text }}
+                  title="Typography & theme options"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+
+                {/* Fullscreen toggle */}
+                <button
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="p-1.5 rounded-lg border hover:bg-white/5 transition-colors"
+                  style={{ borderColor: currentTheme.border, color: currentTheme.text }}
+                  title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen Reading Mode'}
+                >
+                  {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+
+                {/* Free Community Mirror (100% Free, Zero Paywalls) */}
+                {currentNovel.freeReadUrl && (
+                  <a
+                    href={currentNovel.freeReadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg border hover:bg-white/5 transition-colors flex items-center gap-1 text-emerald-300"
+                    style={{ borderColor: currentTheme.border }}
+                    title="Read additional volumes on free open webnovel archives (No paywalls or logins)"
+                  >
+                    <Globe className="w-4 h-4 text-emerald-400" />
+                    <span className="hidden lg:inline text-[10px] font-mono">Free Web Archive</span>
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {/* Bookmark Saved Notice Pill */}
+            {bookmarkSavedNotice && (
+              <div className="bg-emerald-950/95 border-b border-emerald-600/50 py-2 px-4 text-center text-xs text-emerald-200 flex items-center justify-center gap-2 animate-in fade-in">
+                <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="font-medium font-cinzel">
+                  Demigod's Bookmark: Page saved with love for Leslye 🌿
+                </span>
+              </div>
+            )}
+
+            {/* Reader Settings Drawer */}
+            {settingsOpen && (
+              <div
+                className="p-4 sm:p-5 border-b text-xs space-y-4 animate-in fade-in"
+                style={{
+                  backgroundColor: `${currentTheme.bg}f8`,
+                  borderColor: currentTheme.border
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-cinzel font-bold uppercase tracking-wider text-amber-300">
+                    Reading Comfort & Typography
+                  </span>
+                  <button onClick={() => setSettingsOpen(false)} className="text-zinc-400 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Theme Picker */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] opacity-75 font-mono">Theme Ambience</label>
+                    <div className="flex gap-2">
+                      {(['parchment', 'candlelight', 'tearoom'] as ReaderTheme[]).map((thm) => {
+                        const tObj = THEME_STYLES[thm];
+                        const active = settings.theme === thm;
+                        return (
+                          <button
+                            key={thm}
+                            onClick={() => setSettings({ ...settings, theme: thm })}
+                            className={`flex-1 py-1.5 px-2 rounded-lg border text-center transition-all flex items-center justify-center gap-1 ${
+                              active ? 'border-amber-400 font-bold scale-105' : 'border-zinc-800 opacity-70'
+                            }`}
+                            style={{ backgroundColor: tObj.bg, color: tObj.text }}
+                          >
+                            <span>{tObj.icon}</span>
+                            <span className="text-[10px] hidden md:inline">{tObj.name.split(' ')[0]}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Font Size */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] opacity-75 font-mono">Text Size: {settings.fontSize}px</label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSettings({ ...settings, fontSize: Math.max(14, settings.fontSize - 2) })}
+                        className="flex-1 py-1.5 rounded-lg border text-center hover:bg-white/10"
+                        style={{ borderColor: currentTheme.border, color: currentTheme.text }}
+                      >
+                        A-
+                      </button>
+                      <button
+                        onClick={() => setSettings({ ...settings, fontSize: Math.min(28, settings.fontSize + 2) })}
+                        className="flex-1 py-1.5 rounded-lg border text-center hover:bg-white/10"
+                        style={{ borderColor: currentTheme.border, color: currentTheme.text }}
+                      >
+                        A+
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Font Family & Spacing */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] opacity-75 font-mono">Font & Line Spacing</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setSettings({ ...settings, fontFamily: settings.fontFamily === 'serif' ? 'sans' : 'serif' })}
+                        className="flex-1 py-1.5 rounded-lg border text-center hover:bg-white/10"
+                        style={{ borderColor: currentTheme.border, color: currentTheme.text }}
+                      >
+                        {settings.fontFamily === 'serif' ? 'Serif (Classic)' : 'Sans (Modern)'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const nextSpacing = settings.lineHeight === 1.6 ? 1.8 : settings.lineHeight === 1.8 ? 2.0 : 1.6;
+                          setSettings({ ...settings, lineHeight: nextSpacing });
+                        }}
+                        className="flex-1 py-1.5 rounded-lg border text-center hover:bg-white/10"
+                        style={{ borderColor: currentTheme.border, color: currentTheme.text }}
+                      >
+                        {settings.lineHeight}x Spacing
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Chapter Table of Contents Drawer */}
+            {chapterDrawerOpen && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in"
+                onClick={() => setChapterDrawerOpen(false)}
+              >
+                <div
+                  className="w-full max-w-lg rounded-2xl border p-5 sm:p-6 shadow-2xl space-y-4 max-h-[80vh] flex flex-col"
+                  style={{ backgroundColor: currentTheme.bg, borderColor: currentTheme.border }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: currentTheme.border }}>
+                    <span className="font-cinzel text-sm font-bold text-amber-300">
+                      Chapters of {currentNovel.title}
+                    </span>
+                    <button onClick={() => setChapterDrawerOpen(false)} style={{ color: currentTheme.text }}>
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="overflow-y-auto space-y-2 flex-1 scrollbar-thin pr-1">
+                    {chapters.map((ch, idx) => (
+                      <button
+                        key={ch.id}
+                        onClick={() => {
+                          setActiveChapterIndex(idx);
+                          setChapterDrawerOpen(false);
+                          if (contentContainerRef.current) contentContainerRef.current.scrollTop = 0;
+                        }}
+                        className={`w-full p-3 rounded-xl border text-left text-xs transition-all flex items-center justify-between ${
+                          activeChapterIndex === idx
+                            ? 'border-amber-400 bg-amber-400/20 font-bold'
+                            : 'border-white/5 hover:border-emerald-600/40 hover:bg-white/5'
+                        }`}
+                        style={{ color: currentTheme.text }}
+                      >
+                        <div>
+                          <span className="block font-mono text-[10px] opacity-75">
+                            Chapter {ch.chapterNumber}
+                          </span>
+                          <span className="text-sm font-cinzel">{ch.title}</span>
+                        </div>
+                        {ch.wordCount && (
+                          <span className="text-[10px] opacity-60 font-mono">{ch.wordCount} words</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Reading Canvas: Handles Both Client-Side react-pdf and Pure Text Novels */}
+            <div
+              ref={contentContainerRef}
+              onScroll={handleScroll}
+              className="p-6 sm:p-12 md:p-16 max-h-[75vh] overflow-y-auto scrollbar-thin selection:bg-amber-400/30 selection:text-white"
+              style={{
+                color: currentTheme.text,
+                fontFamily: settings.fontFamily === 'serif' ? "'Cinzel', Georgia, serif" : "'Plus Jakarta Sans', sans-serif",
+                fontSize: `${settings.fontSize}px`,
+                lineHeight: settings.lineHeight
+              }}
+            >
+              {pdfFile ? (
+                // Client-Side react-pdf Rendering
+                <div className="flex flex-col items-center justify-center space-y-4">
+                  <Document
+                    file={pdfFile}
+                    onLoadSuccess={({ numPages }) => setNumPdfPages(numPages)}
+                    loading={
+                      <div className="py-12 text-center text-xs text-amber-300 animate-pulse font-mono">
+                        Rendering PDF document with react-pdf...
+                      </div>
+                    }
+                    error={
+                      <div className="py-12 text-center text-xs text-rose-400 font-mono">
+                        Could not render PDF. Please verify the document is valid.
+                      </div>
+                    }
+                  >
+                    <div className="shadow-2xl rounded-lg overflow-hidden border border-emerald-900/60 bg-white">
+                      <Page
+                        pageNumber={currentPdfPage}
+                        scale={pdfScale}
+                        renderTextLayer={true}
+                        renderAnnotationLayer={false}
+                      />
+                    </div>
+                  </Document>
+
+                  <div className="flex items-center gap-3 pt-3 text-xs font-mono">
+                    <button
+                      onClick={() => setCurrentPdfPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPdfPage <= 1}
+                      className="px-3 py-1 rounded-lg border hover:bg-white/10 disabled:opacity-40"
+                      style={{ borderColor: currentTheme.border }}
+                    >
+                      ← Prev Page
+                    </button>
+                    <span>
+                      Page {currentPdfPage} of {numPdfPages || '...'}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPdfPage((p) => (numPdfPages ? Math.min(numPdfPages, p + 1) : p + 1))}
+                      disabled={numPdfPages !== null && currentPdfPage >= numPdfPages}
+                      className="px-3 py-1 rounded-lg border hover:bg-white/10 disabled:opacity-40"
+                      style={{ borderColor: currentTheme.border }}
+                    >
+                      Next Page →
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Text Novel Rendering
+                <>
+                  {/* Chapter Title Banner */}
+                  <div className="max-w-3xl mx-auto mb-8 pb-6 border-b text-center space-y-2" style={{ borderColor: currentTheme.border }}>
+                    <span className="text-xs uppercase font-mono tracking-widest text-amber-400/90 block">
+                      {currentNovel.title} · Chapter {currentChapter?.chapterNumber}
+                    </span>
+                    <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight font-cinzel">
+                      {currentChapter?.title}
+                    </h1>
+                    <div className="flex items-center justify-center gap-2 text-xs opacity-75 pt-1">
+                      <span>{currentNovel.author}</span>
+                      <span>·</span>
+                      <span className="text-amber-400 italic">Curated for Lady Leslye</span>
+                    </div>
+                  </div>
+
+                  {/* Chapter Text Body */}
+                  <div className="max-w-3xl mx-auto space-y-6 text-justify leading-relaxed tracking-wide">
+                    {currentChapter?.content ? (
+                      currentChapter.content.split('\n\n').map((paragraph, pIdx) => (
+                        <p key={pIdx} className="indent-4 sm:indent-8 first:indent-0">
+                          {paragraph}
+                        </p>
+                      ))
+                    ) : (
+                      <p className="text-center opacity-70">Scroll content loading...</p>
+                    )}
+                  </div>
+
+                  {/* Demigod Dedication Sign-off at Chapter End */}
+                  <div className="max-w-3xl mx-auto mt-12 pt-8 border-t text-center space-y-3" style={{ borderColor: currentTheme.border }}>
+                    <div className="inline-flex items-center gap-2 p-2.5 rounded-xl bg-black/40 border border-amber-400/30 text-xs text-amber-300">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{currentNovel.chif3nNote}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Sticky Chapter Navigation Footer with Back to Shelf Button */}
+            <div
+              className="px-4 sm:px-8 py-3.5 border-t flex items-center justify-between gap-2 sm:gap-4 text-xs font-medium"
+              style={{
+                borderColor: currentTheme.border,
+                backgroundColor: `${currentTheme.bg}f5`
+              }}
+            >
+              <button
+                onClick={handlePrevChapter}
+                disabled={pdfFile ? currentPdfPage <= 1 : activeChapterIndex <= 0}
+                className="px-3 sm:px-4 py-2 rounded-xl border flex items-center gap-1.5 transition-all disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5"
+                style={{ borderColor: currentTheme.border, color: currentTheme.text }}
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">{pdfFile ? 'Prev Page' : 'Previous Chapter'}</span>
+                <span className="sm:hidden">Prev</span>
+              </button>
+
+              {/* Middle Back to Library Button */}
+              <button
+                onClick={handleBackToLibrary}
+                className="px-3.5 py-1.5 rounded-xl border border-emerald-800/80 hover:border-amber-400 text-amber-300 hover:text-white transition-all flex items-center gap-1.5 font-cinzel text-[11px]"
+              >
+                <BookMarked className="w-3.5 h-3.5" />
+                <span>All Tomes</span>
+              </button>
+
+              <button
+                onClick={handleNextChapter}
+                disabled={pdfFile ? (numPdfPages !== null && currentPdfPage >= numPdfPages) : activeChapterIndex >= chapters.length - 1}
+                className="px-4 sm:px-5 py-2 rounded-xl font-bold transition-all disabled:opacity-30 disabled:pointer-events-none shadow-md flex items-center gap-1.5"
+                style={{
+                  backgroundColor: currentTheme.accent,
+                  color: '#ffffff'
+                }}
+              >
+                <span className="hidden sm:inline">{pdfFile ? 'Next Page' : 'Next Chapter'}</span>
+                <span className="sm:hidden">Next</span>
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Theme Picker */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] opacity-75 font-mono">Theme Ambience</label>
-                <div className="flex gap-2">
-                  {(['parchment', 'candlelight', 'tearoom'] as ReaderTheme[]).map((thm) => {
-                    const tObj = THEME_STYLES[thm];
-                    const active = settings.theme === thm;
-                    return (
-                      <button
-                        key={thm}
-                        onClick={() => setSettings({ ...settings, theme: thm })}
-                        className={`flex-1 py-1.5 px-2 rounded-lg border text-center transition-all flex items-center justify-center gap-1 ${
-                          active ? 'border-amber-400 font-bold scale-105' : 'border-zinc-800 opacity-70'
-                        }`}
-                        style={{ backgroundColor: tObj.bg, color: tObj.text }}
-                      >
-                        <span>{tObj.icon}</span>
-                        <span className="text-[10px] hidden md:inline">{tObj.name.split(' ')[0]}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Font Size */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] opacity-75 font-mono">Text Size: {settings.fontSize}px</label>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setSettings({ ...settings, fontSize: Math.max(14, settings.fontSize - 2) })}
-                    className="flex-1 py-1.5 rounded-lg border text-center hover:bg-white/10"
-                    style={{ borderColor: currentTheme.border, color: currentTheme.text }}
-                  >
-                    A-
-                  </button>
-                  <button
-                    onClick={() => setSettings({ ...settings, fontSize: Math.min(28, settings.fontSize + 2) })}
-                    className="flex-1 py-1.5 rounded-lg border text-center hover:bg-white/10"
-                    style={{ borderColor: currentTheme.border, color: currentTheme.text }}
-                  >
-                    A+
-                  </button>
-                </div>
-              </div>
-
-              {/* Font Family & Spacing */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] opacity-75 font-mono">Font & Line Spacing</label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setSettings({ ...settings, fontFamily: settings.fontFamily === 'serif' ? 'sans' : 'serif' })}
-                    className="flex-1 py-1.5 rounded-lg border text-center hover:bg-white/10"
-                    style={{ borderColor: currentTheme.border, color: currentTheme.text }}
-                  >
-                    {settings.fontFamily === 'serif' ? 'Serif (Classic)' : 'Sans (Modern)'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const nextSpacing = settings.lineHeight === 1.6 ? 1.8 : settings.lineHeight === 1.8 ? 2.0 : 1.6;
-                      setSettings({ ...settings, lineHeight: nextSpacing });
-                    }}
-                    className="flex-1 py-1.5 rounded-lg border text-center hover:bg-white/10"
-                    style={{ borderColor: currentTheme.border, color: currentTheme.text }}
-                  >
-                    {settings.lineHeight}x Spacing
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Chapter Table of Contents Drawer */}
-        {chapterDrawerOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in"
-            onClick={() => setChapterDrawerOpen(false)}
-          >
-            <div
-              className="w-full max-w-lg rounded-2xl border p-5 sm:p-6 shadow-2xl space-y-4 max-h-[80vh] flex flex-col"
-              style={{ backgroundColor: currentTheme.bg, borderColor: currentTheme.border }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: currentTheme.border }}>
-                <span className="font-cinzel text-sm font-bold text-amber-300">
-                  Chapters of {currentNovel.title}
-                </span>
-                <button onClick={() => setChapterDrawerOpen(false)} style={{ color: currentTheme.text }}>
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="overflow-y-auto space-y-2 flex-1 scrollbar-thin pr-1">
-                {chapters.map((ch, idx) => (
-                  <button
-                    key={ch.id}
-                    onClick={() => {
-                      setActiveChapterIndex(idx);
-                      setChapterDrawerOpen(false);
-                      if (contentContainerRef.current) contentContainerRef.current.scrollTop = 0;
-                    }}
-                    className={`w-full p-3 rounded-xl border text-left text-xs transition-all flex items-center justify-between ${
-                      activeChapterIndex === idx
-                        ? 'border-amber-400 bg-amber-400/20 font-bold'
-                        : 'border-white/5 hover:border-emerald-600/40 hover:bg-white/5'
-                    }`}
-                    style={{ color: currentTheme.text }}
-                  >
-                    <div>
-                      <span className="block font-mono text-[10px] opacity-75">
-                        Chapter {ch.chapterNumber}
-                      </span>
-                      <span className="text-sm font-cinzel">{ch.title}</span>
-                    </div>
-                    {ch.wordCount && (
-                      <span className="text-[10px] opacity-60 font-mono">{ch.wordCount} words</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Reading Canvas */}
-        <div
-          ref={contentContainerRef}
-          onScroll={handleScroll}
-          className="p-6 sm:p-12 md:p-16 max-h-[75vh] overflow-y-auto scrollbar-thin selection:bg-amber-400/30 selection:text-white"
-          style={{
-            color: currentTheme.text,
-            fontFamily: settings.fontFamily === 'serif' ? "'Cinzel', Georgia, serif" : "'Plus Jakarta Sans', sans-serif",
-            fontSize: `${settings.fontSize}px`,
-            lineHeight: settings.lineHeight
-          }}
-        >
-          {/* Chapter Title Banner */}
-          <div className="max-w-3xl mx-auto mb-8 pb-6 border-b text-center space-y-2" style={{ borderColor: currentTheme.border }}>
-            <span className="text-xs uppercase font-mono tracking-widest text-amber-400/90 block">
-              {currentNovel.title} · Chapter {currentChapter?.chapterNumber}
-            </span>
-            <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight font-cinzel">
-              {currentChapter?.title}
-            </h1>
-            <div className="flex items-center justify-center gap-2 text-xs opacity-75 pt-1">
-              <span>{currentNovel.author}</span>
-              <span>·</span>
-              <span className="text-amber-400 italic">Curated for Lady Leslye</span>
-            </div>
-          </div>
-
-          {/* Chapter Text Body */}
-          <div className="max-w-3xl mx-auto space-y-6 text-justify leading-relaxed tracking-wide">
-            {currentChapter?.content ? (
-              currentChapter.content.split('\n\n').map((paragraph, pIdx) => (
-                <p key={pIdx} className="indent-4 sm:indent-8 first:indent-0">
-                  {paragraph}
-                </p>
-              ))
-            ) : (
-              <p className="text-center opacity-70">Scroll content loading...</p>
-            )}
-          </div>
-
-          {/* Demigod Dedication Sign-off at Chapter End */}
-          <div className="max-w-3xl mx-auto mt-12 pt-8 border-t text-center space-y-3" style={{ borderColor: currentTheme.border }}>
-            <div className="inline-flex items-center gap-2 p-2.5 rounded-xl bg-black/40 border border-amber-400/30 text-xs text-amber-300">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>{currentNovel.chif3nNote}</span>
-            </div>
           </div>
         </div>
-
-        {/* Sticky Chapter Navigation Footer */}
-        <div
-          className="px-4 sm:px-8 py-3.5 border-t flex items-center justify-between gap-4 text-xs font-medium"
-          style={{
-            borderColor: currentTheme.border,
-            backgroundColor: `${currentTheme.bg}f5`
-          }}
-        >
-          <button
-            onClick={handlePrevChapter}
-            disabled={activeChapterIndex <= 0}
-            className="px-4 py-2 rounded-xl border flex items-center gap-1.5 transition-all disabled:opacity-30 disabled:pointer-events-none hover:bg-white/5"
-            style={{ borderColor: currentTheme.border, color: currentTheme.text }}
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span>Previous Chapter</span>
-          </button>
-
-          <span className="text-[11px] opacity-75 font-mono hidden sm:inline" style={{ color: currentTheme.text }}>
-            Scroll {activeChapterIndex + 1} of {chapters.length}
-          </span>
-
-          <button
-            onClick={handleNextChapter}
-            disabled={activeChapterIndex >= chapters.length - 1}
-            className="px-5 py-2 rounded-xl font-bold transition-all disabled:opacity-30 disabled:pointer-events-none shadow-md flex items-center gap-1.5"
-            style={{
-              backgroundColor: currentTheme.accent,
-              color: '#ffffff'
-            }}
-          >
-            <span>Next Chapter</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

@@ -39,6 +39,7 @@ import { AnimeGachaAltar } from './components/AnimeGachaAltar';
 import { BroadcastSchedule } from './components/BroadcastSchedule';
 import { LoFiRadio } from './components/LoFiRadio';
 import { LiveLoveScrollChatbox } from './components/LiveLoveScrollChatbox';
+import { ImperialCoupleGame } from './components/ImperialCoupleGame';
 import { WatchActivityChart } from './components/WatchActivityChart';
 import { AmbientCanvas } from './components/AmbientCanvas';
 import { AnimeItem, DateNightItem, WatchHistoryItem, DailyWatchActivity } from './types/anime';
@@ -65,6 +66,7 @@ export default function App() {
   const [gachaModalOpen, setGachaModalOpen] = useState(false);
   const [radioModalOpen, setRadioModalOpen] = useState(false);
   const [floatingChatOpen, setFloatingChatOpen] = useState(false);
+  const [gameModalOpen, setGameModalOpen] = useState(false);
 
   // Ambience mode
   const [ambientMode, setAmbientMode] = useState<'stars' | 'sakura' | 'off'>('stars');
@@ -418,6 +420,11 @@ export default function App() {
         onClose={() => setRadioModalOpen(false)}
       />
 
+      <ImperialCoupleGame
+        isOpen={gameModalOpen}
+        onClose={() => setGameModalOpen(false)}
+      />
+
       {/* Top Navbar with Branding */}
       <Navbar
         activeTab={activeTab}
@@ -429,6 +436,7 @@ export default function App() {
         onOpenGacha={() => setGachaModalOpen(true)}
         onOpenRadio={() => setRadioModalOpen(true)}
         onOpenPoetry={() => setPoetryDrawerOpen(true)}
+        onOpenGame={() => setGameModalOpen(true)}
         ambientMode={ambientMode}
         onToggleAmbient={handleToggleAmbient}
         dateNightCount={dateNightItems.length}
@@ -461,6 +469,13 @@ export default function App() {
             }`}
           >
             <span>🌿 Realm Home</span>
+          </button>
+
+          <button
+            onClick={() => setGameModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-400/50 hover:border-amber-300 text-amber-300 hover:text-white text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start shadow-sm"
+          >
+            <span>🎮 Couple Duel (IRL Online)</span>
           </button>
 
           <button
@@ -501,6 +516,14 @@ export default function App() {
           >
             <Dice5 className="w-3.5 h-3.5 text-amber-400" />
             <span>🎲 Anime Gacha Altar</span>
+          </button>
+
+          <button
+            onClick={() => setGameModalOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-rose-500/20 border border-amber-400/50 hover:border-amber-300 text-amber-300 hover:text-white text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start shadow-sm active:scale-95"
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span>🎮 Palace Arcade (2-Player IRL)</span>
           </button>
 
           <button

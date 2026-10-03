@@ -3,6 +3,7 @@ import path from 'path';
 import http from 'http';
 import { fileURLToPath } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
+import { GoogleGenAI } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +12,14 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+
+// Initialize Google GenAI client
+let aiClient: GoogleGenAI | null = null;
+try {
+  aiClient = new GoogleGenAI({});
+} catch (err) {
+  console.warn('[Gemini API] GenAI client init notice (will use procedural fallback if key absent):', err);
+}
 
 // -------------------------------------------------------------
 // Real-time Love Scrolls / Live Chatbox In-Memory Store
@@ -503,12 +512,369 @@ app.get('/api/proxy', async (req: Request, res: Response) => {
 });
 
 // -------------------------------------------------------------
+// AI-Powered & Procedural Infinite Apothecary Affirmations
+// -------------------------------------------------------------
+const PROCEDURAL_AFFIRMATION_HERBS = [
+  "Sweet Mountain Angelica & Licorice Root",
+  "Dried Star Jasmine & Silver Needle Tea",
+  "Crushed Rose Quartz & Imperial Lotus",
+  "Wild Ginseng & Steamed Chrysanthemum",
+  "Honeyed Wolfberry & Red Date Elixir",
+  "Roasted Barley & Palace Honeycomb",
+  "Peppermint & Glacial Snow Lotus",
+  "Imperial Ox-Bezoar & Dragon Flute Root",
+  "Sacred Agarwood & Golden Osmanthus",
+  "Moonlit Magnolia & Pearl Powder",
+  "Bitter Melon & Amber Pine Resin",
+  "Crimson Camellia & Celestial Spring Dew"
+];
+
+const PROCEDURAL_TEMPERAMENTS = [
+  "Tranquility, Rest & Deep Peace",
+  "Intellectual Brilliance & Razor Focus",
+  "Undying Demigod Devotion & Protection",
+  "Patience, Gentleness & Restoration",
+  "Palace Immunity Against All Stress",
+  "Radiant Warmth & Courage",
+  "Unrivaled Mystery-Solving Genius",
+  "Celestial Harmony & Sweet Dreams"
+];
+
+const PROCEDURAL_QUOTES = [
+  "Even the deadliest poison in the imperial palace yields to the right remedy; take today one breath at a time, my beloved Leslye. 🌿",
+  "Curiosity is your greatest superpower. Walk softly, uncover the truth, but fear no shadow today. ✨",
+  "No court conspiracy, worldly noise, or tiresome duties can diminish how intensely your Demigod adores you every single day. ❤️",
+  "Like rare medicinal herbs found on misty peaks, the most exquisite souls require warmth and patience to bloom. Rest your eyes when weary.",
+  "Testing for poison is basic palace protocol—testing my love for you reveals 100% celestial purity with absolute zero toxins. 🧪",
+  "Whenever mortal life feels bitter, remember that the most potent medicines taste sharpest before bringing legendary vitality. You are cherished.",
+  "Like Maomao unraveling the imperial court's darkest riddles, you handle every challenge with effortless elegance and unmatched brilliance.",
+  "If the imperial banquet is full of pretenders, let us slip away to our herbal laboratory and binge our favorite shows together. 🍵",
+  "Your smile has higher medicinal efficacy than thousand-year-old wild ginseng. One glance heals every ache in my demigod heart.",
+  "May your tea stay hot, your snacks remain sweet, and your day be protected from all tiresome people by royal decree.",
+  "A true apothecary never rushes the decoction. Breathe in, breathe out—everything will align for you in perfect time, my love.",
+  "You don't need to prove anything to anyone in this realm. Being yourself is already the highest imperial treasure.",
+  "The celestial stars align whenever you laugh. May today grant you quiet moments of pure peace and cozy joy."
+];
+
+app.post('/api/affirmations/generate', async (req: Request, res: Response) => {
+  const { mood, theme } = req.body || {};
+
+  // Try generating via Gemini API if aiClient is active
+  if (aiClient) {
+    try {
+      const prompt = `You are the Imperial Apothecary Oracle in "Leslye's Realm", a cozy anime streaming sanctuary crafted with demigod devotion by Sir Chif3n for his girlfriend Leslye (who is adored like Maomao from The Apothecary Diaries).
+User requested mood: "${mood || 'encouraging and loving'}", theme: "${theme || 'apothecary wisdom'}".
+Generate a brand new, never-seen-before daily affirmation for Lady Leslye.
+Respond ONLY with a valid JSON object matching this schema without markdown fences:
+{
+  "quote": "Bespoke inspirational/loving quote blending apothecary wisdom, anime coziness, and demigod romance (1-2 sentences)",
+  "herb": "Name of an authentic or mystical medicinal herb/elixir (e.g. Mountain Angelica, Dried Star Jasmine, Ox Bezoar, Golden Osmanthus)",
+  "temperament": "Virtue or mood (e.g. Tranquility & Insight, Radiant Courage, Demigod Devotion)",
+  "decree": "Imperial Rear Palace Decree #[random 3 digits] or Demigod Sanctuary Decree #[random 3 digits]",
+  "aiNote": "A quick 1-sentence whisper from Sir Chif3n or Maomao"
+}`;
+
+      const aiResponse = await aiClient.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+      });
+
+      const responseText = aiResponse.text?.trim() || '';
+      // Clean JSON if wrapped in markdown
+      const cleaned = responseText.replace(/^```json\s*/, '').replace(/\s*```$/, '').trim();
+      const parsed = JSON.parse(cleaned);
+      if (parsed.quote && parsed.herb) {
+        return res.json({
+          success: true,
+          source: 'gemini-3.8-flash',
+          affirmation: {
+            quote: parsed.quote,
+            herb: parsed.herb,
+            temperament: parsed.temperament || 'Imperial Grace',
+            decree: parsed.decree || `Imperial Decree #${Math.floor(100 + Math.random() * 899)}`,
+            aiNote: parsed.aiNote || 'Brewed with infinite devotion by your Demigod ❤️'
+          }
+        });
+      }
+    } catch (err: any) {
+      console.warn('[Gemini AI] Affirmation generation fallback to procedural:', err?.message || err);
+    }
+  }
+
+  // Procedural Infinite Generator fallback
+  const randomQuote = PROCEDURAL_QUOTES[Math.floor(Math.random() * PROCEDURAL_QUOTES.length)];
+  const randomHerb = PROCEDURAL_AFFIRMATION_HERBS[Math.floor(Math.random() * PROCEDURAL_AFFIRMATION_HERBS.length)];
+  const randomTemp = PROCEDURAL_TEMPERAMENTS[Math.floor(Math.random() * PROCEDURAL_TEMPERAMENTS.length)];
+  const decreeNum = Math.floor(100 + Math.random() * 900);
+  const decrees = [
+    `Imperial Rear Palace Decree #${decreeNum}`,
+    `Demigod Sanctuary Decree #${decreeNum}`,
+    `Maomao Herbal Ledger #${decreeNum}`,
+    `Imperial Court Decree #${decreeNum}`
+  ];
+
+  res.json({
+    success: true,
+    source: 'imperial-oracle-procedural',
+    affirmation: {
+      quote: randomQuote,
+      herb: randomHerb,
+      temperament: randomTemp,
+      decree: decrees[Math.floor(Math.random() * decrees.length)],
+      aiNote: 'Brewed freshly from the Imperial Apothecary Crucible ✨'
+    }
+  });
+});
+
+// -------------------------------------------------------------
+// Real-Time Multi-Game Couple Arcade (Demigod vs Maomao)
+// -------------------------------------------------------------
+export interface TriviaQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  category: string;
+  difficulty: string;
+  funFact: string;
+}
+
+const TRIVIA_QUESTIONS: TriviaQuestion[] = [
+  {
+    id: 't-1',
+    question: "In 'The Apothecary Diaries', what rare item does Maomao get uncontrollably excited about?",
+    options: ["Gold Ingots", "Ox-Bezoar (Bovine Gallstone)", "Silk Kimonos", "Imperial Hairpins"],
+    correctIndex: 1,
+    category: "The Apothecary Diaries 🌿",
+    difficulty: "Imperial Basic",
+    funFact: "Maomao's eyes sparkle whenever ox-bezoar is mentioned—she considers it far more valuable than gold!"
+  },
+  {
+    id: 't-2',
+    question: "Who loves Lady Leslye more than anyone else in the entire multiverse?",
+    options: ["Sir Chif3n (Her Demigod)", "Jinshi", "Gojo Satoru", "Himmel the Hero"],
+    correctIndex: 0,
+    category: "Demigod Devotion 👑",
+    difficulty: "Undisputed Fact",
+    funFact: "Sir Chif3n's love has been tested with 100% purity and zero toxins across all dimensions!"
+  },
+  {
+    id: 't-3',
+    question: "In 'Frieren: Beyond Journey's End', what kind of eccentric spells does Frieren love collecting?",
+    options: ["World-destroying fire magic", "Spells that make flowers bloom & dissolve clothes", "Instant teleportation spells", "Mind reading hexes"],
+    correctIndex: 1,
+    category: "Frieren 🪄",
+    difficulty: "Adventurer",
+    funFact: "Frieren will accept odd jobs just to receive folk grimoires for cleaning bronze statues or making sweet shaved ice!"
+  },
+  {
+    id: 't-4',
+    question: "What is the First Law of Equivalent Exchange in 'Fullmetal Alchemist'?",
+    options: ["To obtain something, something of equal value must be lost", "Energy cannot be created or destroyed", "Gold can be forged from lead", "Love conquers all alchemy"],
+    correctIndex: 0,
+    category: "Fullmetal Alchemist ⚡",
+    difficulty: "State Alchemist",
+    funFact: "Humankind cannot gain anything without first giving something in return—except Sir Chif3n's unconditional pampering for Leslye!"
+  },
+  {
+    id: 't-5',
+    question: "In 'The Apothecary Diaries', how does Maomao often test whether a food contains poison?",
+    options: ["She feeds it to a palace guard", "She tastes it herself with pure clinical delight", "She drops silver chopsticks into it", "She gives it to a cat"],
+    correctIndex: 1,
+    category: "The Apothecary Diaries 🌿",
+    difficulty: "Apothecary Test",
+    funFact: "Her ecstatic face when tasting venomous soups shocked the entire rear palace banquet!"
+  },
+  {
+    id: 't-6',
+    question: "In 'Ascendance of a Bookworm', what is Myne's ultimate life obsession?",
+    options: ["Baking cakes", "Reading books and making paper", "Becoming a knight", "Sleeping all day"],
+    correctIndex: 1,
+    category: "Bookworm 📖",
+    difficulty: "Librarian",
+    funFact: "Myne would happily reinvent the printing press from scratch just to hold a book!"
+  },
+  {
+    id: 't-7',
+    question: "In 'Demon Slayer', what floral fragrance is Muzan Kibutsuji desperately seeking?",
+    options: ["Blue Spider Lily", "Red Moon Orchid", "Golden Lotus", "Imperial Cherry Blossom"],
+    correctIndex: 0,
+    category: "Demon Slayer ⚔️",
+    difficulty: "Demon Slayer Corps",
+    funFact: "The mythical Blue Spider Lily only blooms during the daytime a few days each year!"
+  },
+  {
+    id: 't-8',
+    question: "In 'Spirited Away', what did Chihiro's parents greedily transform into?",
+    options: ["Frogs", "Pigs", "Crows", "Shadows"],
+    correctIndex: 1,
+    category: "Studio Ghibli 🏮",
+    difficulty: "Bathhouse Classic",
+    funFact: "Haku helped Chihiro remember her name so she wouldn't forget her mortal identity."
+  }
+];
+
+const ALCHEMY_HERB_PAIRS = [
+  { symbol: '🌿', name: 'Sweet Angelica' },
+  { symbol: '🌸', name: 'Snow Lotus' },
+  { symbol: '🧄', name: 'Ox-Bezoar' },
+  { symbol: '🧪', name: 'Phoenix Elixir' },
+  { symbol: '🍯', name: 'Honey Wolfberry' },
+  { symbol: '🍵', name: 'Silver Needle' },
+  { symbol: '🍄', name: 'Celestial Truffle' },
+  { symbol: '💎', name: 'Jade Licorice' }
+];
+
+function createShuffledAlchemyCards() {
+  const cards: Array<{ id: number; symbol: string; herbName: string; isMatched: boolean; matchedBy?: string }> = [];
+  let id = 0;
+  for (const pair of ALCHEMY_HERB_PAIRS) {
+    cards.push({ id: id++, symbol: pair.symbol, herbName: pair.name, isMatched: false });
+    cards.push({ id: id++, symbol: pair.symbol, herbName: pair.name, isMatched: false });
+  }
+  // Shuffle cards
+  for (let i = cards.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cards[i], cards[j]] = [cards[j], cards[i]];
+  }
+  return cards;
+}
+
+export interface ArcadeState {
+  activeGame: 'board' | 'trivia' | 'alchemy';
+  boardGame: {
+    board: (string | null)[][];
+    mode: 'tictactoe' | 'gomoku';
+    gridSize: number;
+    currentTurn: 'chif3n' | 'leslye';
+    winner: 'chif3n' | 'leslye' | 'draw' | null;
+    scores: { chif3n: number; leslye: number; ties: number };
+    lastMove: { row: number; col: number; player: string } | null;
+  };
+  triviaGame: {
+    questionIndex: number;
+    totalQuestions: number;
+    currentQuestion: TriviaQuestion;
+    answers: { chif3n: number | null; leslye: number | null };
+    scores: { chif3n: number; leslye: number };
+    revealed: boolean;
+    roundWinner: string | null;
+  };
+  alchemyGame: {
+    cards: Array<{ id: number; symbol: string; herbName: string; isMatched: boolean; matchedBy?: string }>;
+    flippedIndices: number[];
+    currentTurn: 'chif3n' | 'leslye';
+    scores: { chif3n: number; leslye: number };
+    winner: 'chif3n' | 'leslye' | 'draw' | null;
+  };
+  presence: {
+    chif3n: boolean;
+    leslye: boolean;
+    lastPingChif3n: number;
+    lastPingLeslye: number;
+  };
+  lastUpdated: number;
+}
+
+let coupleArcadeState: ArcadeState = {
+  activeGame: 'board',
+  boardGame: {
+    board: [
+      [null, null, null],
+      [null, null, null],
+      [null, null, null]
+    ],
+    mode: 'tictactoe',
+    gridSize: 3,
+    currentTurn: 'chif3n',
+    winner: null,
+    scores: { chif3n: 0, leslye: 0, ties: 0 },
+    lastMove: null
+  },
+  triviaGame: {
+    questionIndex: 0,
+    totalQuestions: TRIVIA_QUESTIONS.length,
+    currentQuestion: TRIVIA_QUESTIONS[0],
+    answers: { chif3n: null, leslye: null },
+    scores: { chif3n: 0, leslye: 0 },
+    revealed: false,
+    roundWinner: null
+  },
+  alchemyGame: {
+    cards: createShuffledAlchemyCards(),
+    flippedIndices: [],
+    currentTurn: 'chif3n',
+    scores: { chif3n: 0, leslye: 0 },
+    winner: null
+  },
+  presence: {
+    chif3n: false,
+    leslye: false,
+    lastPingChif3n: 0,
+    lastPingLeslye: 0
+  },
+  lastUpdated: Date.now()
+};
+
+function broadcastArcadeUpdate() {
+  const payload = JSON.stringify({ type: 'arcade_update', arcade: coupleArcadeState });
+  for (const client of connectedClients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(payload);
+    }
+  }
+}
+
+function checkBoardWin(board: (string | null)[][], size: number, winLength: number): 'chif3n' | 'leslye' | 'draw' | null {
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      const p = board[r][c];
+      if (!p) continue;
+
+      // Horizontal
+      if (c + winLength <= size) {
+        let win = true;
+        for (let k = 0; k < winLength; k++) if (board[r][c + k] !== p) { win = false; break; }
+        if (win) return p as any;
+      }
+      // Vertical
+      if (r + winLength <= size) {
+        let win = true;
+        for (let k = 0; k < winLength; k++) if (board[r + k][c] !== p) { win = false; break; }
+        if (win) return p as any;
+      }
+      // Diagonal down-right
+      if (r + winLength <= size && c + winLength <= size) {
+        let win = true;
+        for (let k = 0; k < winLength; k++) if (board[r + k][c + k] !== p) { win = false; break; }
+        if (win) return p as any;
+      }
+      // Diagonal up-right
+      if (r - winLength + 1 >= 0 && c + winLength <= size) {
+        let win = true;
+        for (let k = 0; k < winLength; k++) if (board[r - k][c + k] !== p) { win = false; break; }
+        if (win) return p as any;
+      }
+    }
+  }
+  const isFull = board.every(row => row.every(cell => cell !== null));
+  if (isFull) return 'draw';
+  return null;
+}
+
+// -------------------------------------------------------------
 // 6. Real-time Love Scrolls API Endpoints
 // -------------------------------------------------------------
 app.get('/api/scrolls', (req: Request, res: Response) => {
+  const since = parseInt(req.query.since as string, 10);
+  if (!isNaN(since) && since > 0) {
+    const fresh = liveLoveScrolls.filter(m => m.timestamp > since);
+    return res.json({ success: true, messages: fresh, serverTime: Date.now() });
+  }
   res.json({
     success: true,
-    messages: liveLoveScrolls
+    messages: liveLoveScrolls,
+    serverTime: Date.now()
   });
 });
 
@@ -536,8 +902,259 @@ app.post('/api/scrolls', (req: Request, res: Response) => {
 
   res.json({
     success: true,
-    message: newScroll
+    message: newScroll,
+    serverTime: Date.now()
   });
+});
+
+// -------------------------------------------------------------
+// 7. Real-Time Couple Multi-Game Arcade Endpoints
+// -------------------------------------------------------------
+app.get('/api/game', (req: Request, res: Response) => {
+  // Prune presence pings older than 15s
+  const now = Date.now();
+  coupleArcadeState.presence.chif3n = (now - coupleArcadeState.presence.lastPingChif3n) < 15000;
+  coupleArcadeState.presence.leslye = (now - coupleArcadeState.presence.lastPingLeslye) < 15000;
+
+  res.json({
+    success: true,
+    arcade: coupleArcadeState,
+    game: coupleArcadeState.boardGame // legacy compatibility
+  });
+});
+
+app.post('/api/game/switch', (req: Request, res: Response) => {
+  const { gameType } = req.body;
+  if (gameType === 'board' || gameType === 'trivia' || gameType === 'alchemy') {
+    coupleArcadeState.activeGame = gameType;
+    coupleArcadeState.lastUpdated = Date.now();
+    broadcastArcadeUpdate();
+  }
+  res.json({ success: true, arcade: coupleArcadeState });
+});
+
+app.post('/api/game/ping', (req: Request, res: Response) => {
+  const { player } = req.body;
+  const now = Date.now();
+  if (player === 'chif3n') {
+    coupleArcadeState.presence.chif3n = true;
+    coupleArcadeState.presence.lastPingChif3n = now;
+  } else if (player === 'leslye') {
+    coupleArcadeState.presence.leslye = true;
+    coupleArcadeState.presence.lastPingLeslye = now;
+  }
+  coupleArcadeState.lastUpdated = now;
+  broadcastArcadeUpdate();
+  res.json({ success: true, presence: coupleArcadeState.presence });
+});
+
+// --- Game 1: Board Game (Tic-Tac-Toe & Gomoku) ---
+app.post(['/api/game/board/move', '/api/game/move'], (req: Request, res: Response) => {
+  const { row, col, player } = req.body;
+  const bg = coupleArcadeState.boardGame;
+  const size = bg.gridSize || 3;
+  const winLen = bg.mode === 'gomoku' ? 4 : 3;
+
+  if (row < 0 || row >= size || col < 0 || col >= size) {
+    return res.status(400).json({ success: false, message: 'Invalid coordinates' });
+  }
+
+  if (bg.winner !== null) {
+    return res.json({ success: false, message: 'Game has already concluded', arcade: coupleArcadeState, game: bg });
+  }
+
+  if (bg.board[row][col] !== null) {
+    return res.json({ success: false, message: 'Square already occupied', arcade: coupleArcadeState, game: bg });
+  }
+
+  // Record move
+  bg.board[row][col] = player;
+  bg.lastMove = { row, col, player };
+  coupleArcadeState.lastUpdated = Date.now();
+
+  // Check winner
+  const winResult = checkBoardWin(bg.board, size, winLen);
+  if (winResult) {
+    bg.winner = winResult;
+    if (winResult === 'chif3n') bg.scores.chif3n++;
+    else if (winResult === 'leslye') bg.scores.leslye++;
+    else if (winResult === 'draw') bg.scores.ties++;
+  } else {
+    // Switch turn
+    bg.currentTurn = player === 'chif3n' ? 'leslye' : 'chif3n';
+  }
+
+  broadcastArcadeUpdate();
+
+  res.json({
+    success: true,
+    arcade: coupleArcadeState,
+    game: bg
+  });
+});
+
+app.post(['/api/game/board/reset', '/api/game/reset'], (req: Request, res: Response) => {
+  const bg = coupleArcadeState.boardGame;
+  const size = bg.gridSize || 3;
+  bg.board = Array(size).fill(null).map(() => Array(size).fill(null));
+  bg.winner = null;
+  bg.lastMove = null;
+  bg.currentTurn = bg.currentTurn === 'chif3n' ? 'leslye' : 'chif3n';
+  coupleArcadeState.lastUpdated = Date.now();
+
+  broadcastArcadeUpdate();
+
+  res.json({
+    success: true,
+    arcade: coupleArcadeState,
+    game: bg
+  });
+});
+
+app.post('/api/game/board/mode', (req: Request, res: Response) => {
+  const { mode } = req.body; // 'tictactoe' | 'gomoku'
+  const bg = coupleArcadeState.boardGame;
+  if (mode === 'gomoku') {
+    bg.mode = 'gomoku';
+    bg.gridSize = 6;
+    bg.board = Array(6).fill(null).map(() => Array(6).fill(null));
+  } else {
+    bg.mode = 'tictactoe';
+    bg.gridSize = 3;
+    bg.board = Array(3).fill(null).map(() => Array(3).fill(null));
+  }
+  bg.winner = null;
+  bg.lastMove = null;
+  coupleArcadeState.lastUpdated = Date.now();
+
+  broadcastArcadeUpdate();
+  res.json({ success: true, arcade: coupleArcadeState });
+});
+
+// --- Game 2: Trivia Showdown ---
+app.post('/api/game/trivia/answer', (req: Request, res: Response) => {
+  const { player, answerIndex } = req.body;
+  const tg = coupleArcadeState.triviaGame;
+
+  if (player === 'chif3n') {
+    tg.answers.chif3n = answerIndex;
+  } else if (player === 'leslye') {
+    tg.answers.leslye = answerIndex;
+  }
+
+  // If both players have answered, reveal and calculate round scores
+  if (tg.answers.chif3n !== null && tg.answers.leslye !== null) {
+    tg.revealed = true;
+    const correct = tg.currentQuestion.correctIndex;
+    if (tg.answers.chif3n === correct && tg.answers.leslye === correct) {
+      tg.scores.chif3n += 10;
+      tg.scores.leslye += 10;
+      tg.roundWinner = 'tie';
+    } else if (tg.answers.chif3n === correct) {
+      tg.scores.chif3n += 10;
+      tg.roundWinner = 'chif3n';
+    } else if (tg.answers.leslye === correct) {
+      tg.scores.leslye += 10;
+      tg.roundWinner = 'leslye';
+    } else {
+      tg.roundWinner = 'none';
+    }
+  }
+
+  coupleArcadeState.lastUpdated = Date.now();
+  broadcastArcadeUpdate();
+  res.json({ success: true, arcade: coupleArcadeState });
+});
+
+app.post('/api/game/trivia/next', (req: Request, res: Response) => {
+  const tg = coupleArcadeState.triviaGame;
+  tg.questionIndex = (tg.questionIndex + 1) % TRIVIA_QUESTIONS.length;
+  tg.currentQuestion = TRIVIA_QUESTIONS[tg.questionIndex];
+  tg.answers = { chif3n: null, leslye: null };
+  tg.revealed = false;
+  tg.roundWinner = null;
+  coupleArcadeState.lastUpdated = Date.now();
+
+  broadcastArcadeUpdate();
+  res.json({ success: true, arcade: coupleArcadeState });
+});
+
+// --- Game 3: Alchemy Herb Memory Duel ---
+app.post('/api/game/alchemy/flip', (req: Request, res: Response) => {
+  const { cardIndex, player } = req.body;
+  const ag = coupleArcadeState.alchemyGame;
+
+  if (ag.winner !== null) {
+    return res.json({ success: false, message: 'Game over', arcade: coupleArcadeState });
+  }
+
+  if (ag.currentTurn !== player) {
+    return res.json({ success: false, message: "Not your turn", arcade: coupleArcadeState });
+  }
+
+  if (cardIndex < 0 || cardIndex >= ag.cards.length) {
+    return res.status(400).json({ success: false, message: 'Invalid card index' });
+  }
+
+  if (ag.cards[cardIndex].isMatched || ag.flippedIndices.includes(cardIndex)) {
+    return res.json({ success: false, message: 'Card already revealed or matched', arcade: coupleArcadeState });
+  }
+
+  if (ag.flippedIndices.length >= 2) {
+    return res.json({ success: false, message: 'Two cards currently flipped', arcade: coupleArcadeState });
+  }
+
+  // Flip the card
+  ag.flippedIndices.push(cardIndex);
+
+  // If two cards now flipped, evaluate match
+  if (ag.flippedIndices.length === 2) {
+    const [idx1, idx2] = ag.flippedIndices;
+    const card1 = ag.cards[idx1];
+    const card2 = ag.cards[idx2];
+
+    if (card1.symbol === card2.symbol) {
+      // MATCH!
+      card1.isMatched = true;
+      card1.matchedBy = player;
+      card2.isMatched = true;
+      card2.matchedBy = player;
+      ag.scores[player as 'chif3n' | 'leslye'] += 10;
+      ag.flippedIndices = []; // clear flipped immediately for match
+
+      // Check all matched
+      if (ag.cards.every(c => c.isMatched)) {
+        if (ag.scores.chif3n > ag.scores.leslye) ag.winner = 'chif3n';
+        else if (ag.scores.leslye > ag.scores.chif3n) ag.winner = 'leslye';
+        else ag.winner = 'draw';
+      }
+      // Player gets another turn on match!
+    } else {
+      // NO MATCH: switch turn after short timeout
+      setTimeout(() => {
+        ag.flippedIndices = [];
+        ag.currentTurn = player === 'chif3n' ? 'leslye' : 'chif3n';
+        coupleArcadeState.lastUpdated = Date.now();
+        broadcastArcadeUpdate();
+      }, 1200);
+    }
+  }
+
+  coupleArcadeState.lastUpdated = Date.now();
+  broadcastArcadeUpdate();
+  res.json({ success: true, arcade: coupleArcadeState });
+});
+
+app.post('/api/game/alchemy/reset', (req: Request, res: Response) => {
+  const ag = coupleArcadeState.alchemyGame;
+  ag.cards = createShuffledAlchemyCards();
+  ag.flippedIndices = [];
+  ag.currentTurn = ag.currentTurn === 'chif3n' ? 'leslye' : 'chif3n';
+  ag.winner = null;
+  coupleArcadeState.lastUpdated = Date.now();
+
+  broadcastArcadeUpdate();
+  res.json({ success: true, arcade: coupleArcadeState });
 });
 
 // -------------------------------------------------------------
@@ -552,10 +1169,11 @@ async function startServer() {
   wss.on('connection', (ws: WebSocket) => {
     connectedClients.add(ws);
 
-    // Send existing love scrolls history immediately upon connect
+    // Send existing love scrolls history and arcade state immediately upon connect
     ws.send(JSON.stringify({
       type: 'init',
-      messages: liveLoveScrolls
+      messages: liveLoveScrolls,
+      arcade: coupleArcadeState
     }));
 
     ws.on('message', (data: any) => {
@@ -576,6 +1194,16 @@ async function startServer() {
           }
 
           broadcastScroll(newScroll);
+        } else if (parsed.type === 'ping_presence' && parsed.player) {
+          const now = Date.now();
+          if (parsed.player === 'chif3n') {
+            coupleArcadeState.presence.chif3n = true;
+            coupleArcadeState.presence.lastPingChif3n = now;
+          } else if (parsed.player === 'leslye') {
+            coupleArcadeState.presence.leslye = true;
+            coupleArcadeState.presence.lastPingLeslye = now;
+          }
+          broadcastArcadeUpdate();
         }
       } catch (e) {
         console.error('WebSocket message parsing error:', e);

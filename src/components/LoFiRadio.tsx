@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Volume2,
-  VolumeX,
   Play,
   Pause,
   Radio,
@@ -9,7 +8,9 @@ import {
   CloudRain,
   Music,
   X,
-  ChevronDown
+  ChevronDown,
+  Flame,
+  Wind
 } from 'lucide-react';
 
 interface Station {
@@ -19,32 +20,80 @@ interface Station {
   icon: string;
   baseFreqs: number[];
   mood: string;
+  waveform: OscillatorType;
+  filterFreq: number;
 }
 
 const STATIONS: Station[] = [
   {
-    id: 'maomao-porch',
-    name: "Maomao's Rainy Herbal Porch",
-    sub: 'Rain & Bamboo Wind Chime Lo-Fi',
-    icon: '🌿',
-    baseFreqs: [261.63, 293.66, 329.63, 392.0, 440.0, 523.25], // C Major Pentatonic
-    mood: 'Soothing rain and gentle herbal chords'
+    id: 'felt-moonlight',
+    name: "Maomao's Moonlight Felt Piano",
+    sub: 'Intimate Felt Grand Piano & Tape Flutter (Hisaishi Style)',
+    icon: '🎹',
+    baseFreqs: [220.0, 261.63, 293.66, 349.23, 392.0, 440.0, 523.25], // D minor / F Major Pentatonic
+    mood: 'Warm felt hammer strikes and nostalgic palace reflections',
+    waveform: 'triangle',
+    filterFreq: 1100
   },
   {
-    id: 'ghibli-teahouse',
-    name: 'Ghibli Palace Tea House',
-    sub: 'Warm Nostalgic Rhodes & Tape Flutter',
-    icon: '🍵',
-    baseFreqs: [220.0, 261.63, 293.66, 349.23, 392.0, 440.0], // F / Dm Pentatonic
-    mood: 'Afternoon tea in the imperial gardens'
+    id: 'ghibli-afternoon',
+    name: 'Ghibli Summer Afternoon Piano',
+    sub: 'Bright Nostalgic Grand Chords & Sunny Breezes',
+    icon: '🍃',
+    baseFreqs: [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33], // C Major Pentatonic
+    mood: 'Rolling green hills and quiet clouds drifting over the countryside',
+    waveform: 'triangle',
+    filterFreq: 1600
   },
   {
-    id: 'celestial-night',
-    name: 'Sir Chif3n Starlight Chill',
-    sub: 'Dreamy Ambient Synth & Celestial Bell',
+    id: 'shinkai-starlight',
+    name: 'Makoto Shinkai Starlight Arpeggios',
+    sub: 'Lyrical Ethereal Piano & Reverb Trails',
     icon: '✨',
-    baseFreqs: [196.0, 246.94, 293.66, 369.99, 440.0, 493.88], // G Major 7th ethereal
-    mood: 'Starry sky date night overlooking the capital'
+    baseFreqs: [196.0, 246.94, 293.66, 369.99, 440.0, 493.88, 587.33], // G Major 7th Sparkle
+    mood: 'Starry skies and intertwined destiny across light-years',
+    waveform: 'sine',
+    filterFreq: 2200
+  },
+  {
+    id: 'rainy-window',
+    name: 'Rainy Windowpane Piano Study',
+    sub: 'Mellow Rhodes & Soft Upright Piano with Steady Drizzle',
+    icon: '🌧️',
+    baseFreqs: [174.61, 220.0, 261.63, 329.63, 392.0, 440.0], // F Major 7th Jazz
+    mood: 'Watching rain beads roll down glass while wrapped in a blanket',
+    waveform: 'triangle',
+    filterFreq: 950
+  },
+  {
+    id: 'chif3n-lullaby',
+    name: "Sir Chif3n's Lullaby for Leslye",
+    sub: 'Tender Romantic Piano & Celestial Bell Chimes',
+    icon: '💖',
+    baseFreqs: [261.63, 329.63, 392.0, 493.88, 523.25, 659.25], // C Major 7th
+    mood: 'Composed with demigod devotion for deep sweet dreams',
+    waveform: 'sine',
+    filterFreq: 1400
+  },
+  {
+    id: 'tea-garden',
+    name: 'Imperial Palace Tea Garden Serenade',
+    sub: 'Traditional Pentatonic Piano & Silk Flute Resonance',
+    icon: '🍵',
+    baseFreqs: [220.0, 246.94, 293.66, 349.23, 440.0, 493.88], // A Minor Eastern Pentatonic
+    mood: 'Steaming green tea overlooking quiet koi ponds',
+    waveform: 'triangle',
+    filterFreq: 1250
+  },
+  {
+    id: 'autumn-leaves',
+    name: 'Autumn Leaves & Warm Cocoa Piano',
+    sub: 'Gentle Jazz Ballad Progression & Vinyl Crackle',
+    icon: '🍂',
+    baseFreqs: [196.0, 246.94, 293.66, 329.63, 392.0, 440.0, 493.88], // Em Pentatonic
+    mood: 'Cozy late night study session with fireplace warmth',
+    waveform: 'triangle',
+    filterFreq: 1050
   }
 ];
 
@@ -53,10 +102,12 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
   const [currentStationIdx, setCurrentStationIdx] = useState<number>(0);
   const [volume, setVolume] = useState<number>(0.35);
   const [rainEnabled, setRainEnabled] = useState<boolean>(true);
+  const [crackleEnabled, setCrackleEnabled] = useState<boolean>(true);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const rainGainRef = useRef<GainNode | null>(null);
+  const crackleGainRef = useRef<GainNode | null>(null);
   const chordTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentStation = STATIONS[currentStationIdx];
@@ -73,7 +124,7 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
       audioCtxRef.current = ctx;
       masterGainRef.current = master;
 
-      // Create pink noise for rain/tape hiss
+      // 1. Rain noise generator
       const bufferSize = ctx.sampleRate * 2;
       const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
@@ -94,10 +145,9 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
       noiseSource.buffer = noiseBuffer;
       noiseSource.loop = true;
 
-      // Lowpass filter for cozy muffled rain
       const rainFilter = ctx.createBiquadFilter();
       rainFilter.type = 'lowpass';
-      rainFilter.frequency.setValueAtTime(800, ctx.currentTime);
+      rainFilter.frequency.setValueAtTime(750, ctx.currentTime);
 
       const rainGain = ctx.createGain();
       rainGain.gain.setValueAtTime(rainEnabled ? 0.12 : 0, ctx.currentTime);
@@ -106,8 +156,13 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
       rainFilter.connect(rainGain);
       rainGain.connect(master);
       noiseSource.start();
-
       rainGainRef.current = rainGain;
+
+      // 2. Vinyl crackle generator
+      const crackleGain = ctx.createGain();
+      crackleGain.gain.setValueAtTime(crackleEnabled ? 0.04 : 0, ctx.currentTime);
+      crackleGain.connect(master);
+      crackleGainRef.current = crackleGain;
     }
 
     if (audioCtxRef.current.state === 'suspended') {
@@ -115,36 +170,47 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
     }
   };
 
-  // Play a soft bell/chord tone
-  const playChordNote = (freq: number, duration: number, delay: number) => {
+  // Play rich resonant acoustic piano note
+  const playPianoNote = (freq: number, duration: number, delay: number) => {
     if (!audioCtxRef.current || !masterGainRef.current) return;
     const ctx = audioCtxRef.current;
+    const now = ctx.currentTime + delay;
 
-    const osc = ctx.createOscillator();
+    // Dual oscillator for rich piano hammer overtones
+    const oscMain = ctx.createOscillator();
+    const oscOvertone = ctx.createOscillator();
     const noteGain = ctx.createGain();
     const filter = ctx.createBiquadFilter();
 
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+    oscMain.type = currentStation.waveform;
+    oscMain.frequency.setValueAtTime(freq, now);
 
-    // Warm vintage tape filter
+    // Overtone 2nd harmonic with slight detune for warm acoustic chorusing
+    oscOvertone.type = 'sine';
+    oscOvertone.frequency.setValueAtTime(freq * 2 + (Math.random() * 0.4 - 0.2), now);
+
+    // Dynamic lowpass filter (piano hammer dynamics)
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1400, ctx.currentTime + delay);
-    filter.Q.setValueAtTime(2, ctx.currentTime + delay);
+    filter.frequency.setValueAtTime(currentStation.filterFreq, now);
+    filter.frequency.exponentialRampToValueAtTime(300, now + duration);
 
-    noteGain.gain.setValueAtTime(0, ctx.currentTime + delay);
-    noteGain.gain.linearRampToValueAtTime(0.08, ctx.currentTime + delay + 0.1);
-    noteGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + duration);
+    // Piano strike envelope: fast attack, natural acoustic decay
+    noteGain.gain.setValueAtTime(0, now);
+    noteGain.gain.linearRampToValueAtTime(0.09, now + 0.02);
+    noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
-    osc.connect(filter);
+    oscMain.connect(filter);
+    oscOvertone.connect(filter);
     filter.connect(noteGain);
     noteGain.connect(masterGainRef.current);
 
-    osc.start(ctx.currentTime + delay);
-    osc.stop(ctx.currentTime + delay + duration);
+    oscMain.start(now);
+    oscOvertone.start(now);
+    oscMain.stop(now + duration);
+    oscOvertone.stop(now + duration);
   };
 
-  // Sequence gentle pentatonic melody loop
+  // Sequence piano progression loop
   useEffect(() => {
     if (!isPlaying) {
       if (chordTimerRef.current) clearInterval(chordTimerRef.current);
@@ -153,34 +219,34 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
 
     initAudio();
 
-    const triggerArpeggio = () => {
+    const triggerPianoChords = () => {
       const freqs = currentStation.baseFreqs;
-      // Pick 3-4 soft notes from the pentatonic scale
-      const numNotes = 3 + Math.floor(Math.random() * 2);
-      for (let i = 0; i < numNotes; i++) {
+      // Arpeggiate 3 to 5 notes
+      const count = 3 + Math.floor(Math.random() * 3);
+      for (let i = 0; i < count; i++) {
         const randFreq = freqs[Math.floor(Math.random() * freqs.length)];
-        const octaveShift = Math.random() > 0.6 ? 2 : 1;
-        const delay = i * 0.45;
-        playChordNote(randFreq * octaveShift, 3.2, delay);
+        const octave = Math.random() > 0.4 ? 1 : 2;
+        const noteDelay = i * 0.45;
+        playPianoNote(randFreq * octave, 3.8, noteDelay);
       }
     };
 
-    triggerArpeggio();
-    chordTimerRef.current = setInterval(triggerArpeggio, 3600);
+    triggerPianoChords();
+    chordTimerRef.current = setInterval(triggerPianoChords, 3500);
 
     return () => {
       if (chordTimerRef.current) clearInterval(chordTimerRef.current);
     };
   }, [isPlaying, currentStationIdx]);
 
-  // Adjust volume
+  // Volume
   useEffect(() => {
     if (masterGainRef.current && audioCtxRef.current) {
       masterGainRef.current.gain.setValueAtTime(volume, audioCtxRef.current.currentTime);
     }
   }, [volume]);
 
-  // Adjust rain
+  // Rain
   useEffect(() => {
     if (rainGainRef.current && audioCtxRef.current) {
       rainGainRef.current.gain.setValueAtTime(rainEnabled ? 0.12 : 0, audioCtxRef.current.currentTime);
@@ -199,7 +265,7 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 w-80 sm:w-96 rounded-2xl bg-[#06150fe6] border border-amber-400/40 p-4 sm:p-5 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-3 space-y-4">
+    <div className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 w-80 sm:w-96 rounded-2xl bg-[#06150fe6] border border-amber-400/50 p-4 sm:p-5 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-3 space-y-4">
       {/* Top Header */}
       <div className="flex items-center justify-between border-b border-emerald-900/60 pb-3">
         <div className="flex items-center gap-2">
@@ -208,9 +274,9 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
           </div>
           <div>
             <span className="font-cinzel text-[10px] font-bold text-amber-300 uppercase tracking-widest block">
-              Imperial Ambient Synth
+              Imperial Synthesized Chamber
             </span>
-            <h3 className="font-cinzel text-sm font-bold text-white">OST Lo-Fi Radio</h3>
+            <h3 className="font-cinzel text-sm font-bold text-white">OST & Piano Sanctuary</h3>
           </div>
         </div>
 
@@ -222,9 +288,11 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
         </button>
       </div>
 
-      {/* Station Selector */}
-      <div className="space-y-1.5">
-        <span className="text-[10px] uppercase font-mono text-emerald-500">Select Chamber:</span>
+      {/* Station Selector with 7 Piano Channels */}
+      <div className="space-y-1.5 max-h-56 overflow-y-auto scrollbar-thin pr-1">
+        <span className="text-[10px] uppercase font-mono text-emerald-500">
+          Select Piano Melodic Chamber ({STATIONS.length} Channels):
+        </span>
         <div className="grid grid-cols-1 gap-1.5">
           {STATIONS.map((stn, idx) => (
             <button
@@ -232,12 +300,12 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
               onClick={() => setCurrentStationIdx(idx)}
               className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between ${
                 currentStationIdx === idx
-                  ? 'bg-amber-400/15 border-amber-400 text-amber-300 font-semibold'
+                  ? 'bg-amber-400/15 border-amber-400 text-amber-300 font-semibold shadow-md'
                   : 'bg-[#04120c] border-emerald-900/70 text-emerald-200 hover:border-emerald-600'
               }`}
             >
               <div className="flex items-center gap-2 truncate">
-                <span className="text-base">{stn.icon}</span>
+                <span className="text-base shrink-0">{stn.icon}</span>
                 <div className="truncate">
                   <span className="text-xs truncate block font-cinzel">{stn.name}</span>
                   <span className="text-[10px] opacity-75 truncate block font-mono">{stn.sub}</span>
@@ -251,14 +319,38 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
         </div>
       </div>
 
-      {/* Play Controls & Volume */}
+      {/* Interactive Mini Piano Keys (Tap to play notes) */}
+      <div className="p-2 rounded-xl bg-[#030d08] border border-emerald-900/80 space-y-1">
+        <span className="text-[9px] uppercase font-mono text-emerald-500 block text-center">
+          Tap Keys to Play Along with the Chamber 🎹
+        </span>
+        <div className="flex justify-center gap-1">
+          {['C', 'D', 'E', 'F', 'G', 'A', 'B'].map((note, idx) => {
+            const freq = 261.63 * Math.pow(2, idx / 12 * 2);
+            return (
+              <button
+                key={note}
+                onClick={() => {
+                  initAudio();
+                  playPianoNote(freq, 2.5, 0);
+                }}
+                className="w-8 h-14 rounded-b-md bg-gradient-to-b from-white to-zinc-200 hover:from-amber-200 hover:to-amber-100 text-black text-[10px] font-bold pb-1 flex flex-col justify-end items-center shadow-inner active:scale-95 transition-all"
+              >
+                <span>{note}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Play Controls & Ambience Toggles */}
       <div className="pt-2 border-t border-emerald-900/60 flex items-center justify-between gap-3">
         <button
           onClick={togglePlay}
           className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95"
         >
           {isPlaying ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
-          <span>{isPlaying ? 'Pause Melody' : 'Play Lo-Fi'}</span>
+          <span>{isPlaying ? 'Pause Melody' : 'Play Piano'}</span>
         </button>
 
         {/* Rain Toggle */}
@@ -269,14 +361,14 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
               ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300'
               : 'bg-[#030e09] border-emerald-900 text-zinc-500'
           }`}
-          title="Toggle cozy rain background noise"
+          title="Toggle soft rainfall sound"
         >
           <CloudRain className="w-3.5 h-3.5" />
           <span className="text-[10px] hidden sm:inline">Rain</span>
         </button>
 
         {/* Volume Slider */}
-        <div className="flex items-center gap-1.5 flex-1 max-w-[100px]">
+        <div className="flex items-center gap-1.5 flex-1 max-w-[90px]">
           <Volume2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           <input
             type="range"
@@ -289,10 +381,6 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
           />
         </div>
       </div>
-
-      <p className="text-[10px] text-emerald-500/80 text-center italic">
-        "Curated background soundscape for Leslye's study & relax sessions"
-      </p>
     </div>
   );
 };

@@ -7,11 +7,10 @@ import {
   Sparkles,
   MessageCircle,
   X,
-  Minimize2,
-  Maximize2,
   Smile,
   Shield,
-  Clock
+  Clock,
+  RotateCw
 } from 'lucide-react';
 
 export interface LiveLoveMessage {
@@ -42,12 +41,12 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
       return 'Sir Chif3n (Demigod) 👑';
     }
   });
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [isMinimized, setIsMinimized] = useState<boolean>(false);
+  const [isConnected, setIsConnected] = useState<boolean>(true);
+  const [lastSyncTime, setLastSyncTime] = useState<number>(0);
 
   const socketRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTimestampRef = useRef<number>(0);
 
   // Auto-scroll to bottom of messages
   const scrollToBottom = () => {
@@ -56,81 +55,85 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages.length]);
 
-  // Initial load via REST API and then WebSocket connection
-  const fetchMessagesFromApi = async () => {
+  // Ultra-fast Real-Time Synchronizer: fetches new messages from server
+  const syncMessages = async () => {
     try {
-      const res = await fetch('/api/scrolls');
+      const res = await fetch(`/api/scrolls?since=${lastTimestampRef.current}`);
       if (res.ok) {
         const json = await res.json();
-        if (json.messages && Array.isArray(json.messages)) {
-          setMessages(json.messages);
+        if (json.messages && Array.isArray(json.messages) && json.messages.length > 0) {
+          setMessages((prev) => {
+            const existingIds = new Set(prev.map((m) => m.id));
+            const newOnes = json.messages.filter((m: LiveLoveMessage) => !existingIds.has(m.id));
+            if (newOnes.length === 0) return prev;
+            const combined = [...prev, ...newOnes].sort((a, b) => a.timestamp - b.timestamp);
+            lastTimestampRef.current = combined[combined.length - 1].timestamp;
+            return combined;
+          });
+          setLastSyncTime(Date.now());
         }
       }
     } catch (e) {
-      console.warn('Could not fetch scrolls from REST API:', e);
+      console.warn('Real-time sync poll failed:', e);
     }
   };
 
+  // Initial full fetch & fast 1.2-second polling loop
   useEffect(() => {
-    fetchMessagesFromApi();
-
-    // Connect WebSocket
-    const connectWs = () => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}`;
-
-      try {
-        const ws = new WebSocket(wsUrl);
-        socketRef.current = ws;
-
-        ws.onopen = () => {
-          setIsConnected(true);
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === 'init' && Array.isArray(data.messages)) {
-              setMessages(data.messages);
-            } else if (data.type === 'new_message' && data.message) {
-              setMessages((prev) => {
-                // Avoid duplicates
-                if (prev.some((m) => m.id === data.message.id)) return prev;
-                return [...prev, data.message];
-              });
-            }
-          } catch (err) {
-            console.error('Error parsing WS message:', err);
+    // 1. Initial full fetch
+    fetch('/api/scrolls')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.messages && Array.isArray(data.messages)) {
+          setMessages(data.messages);
+          if (data.messages.length > 0) {
+            lastTimestampRef.current = data.messages[data.messages.length - 1].timestamp;
           }
-        };
+          setLastSyncTime(Date.now());
+        }
+      })
+      .catch((e) => console.warn(e));
 
-        ws.onclose = () => {
-          setIsConnected(false);
-          // Auto reconnect after 3 seconds
-          reconnectTimeoutRef.current = setTimeout(connectWs, 3000);
-        };
+    // 2. Ultra-fast 1.2-second polling to guarantee real-time updates across different mobile devices
+    const pollTimer = setInterval(syncMessages, 1200);
 
-        ws.onerror = () => {
-          setIsConnected(false);
-        };
-      } catch (err) {
-        console.warn('WS connection failed, falling back to REST polling:', err);
-      }
-    };
+    // 3. Parallel WebSocket connection for sub-second updates
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}`;
 
-    connectWs();
+    try {
+      const ws = new WebSocket(wsUrl);
+      socketRef.current = ws;
 
-    // Secondary fallback polling every 4 seconds to guarantee real-time sync everywhere
-    const pollInterval = setInterval(fetchMessagesFromApi, 4000);
+      ws.onopen = () => setIsConnected(true);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'init' && Array.isArray(data.messages)) {
+            setMessages(data.messages);
+            if (data.messages.length > 0) {
+              lastTimestampRef.current = data.messages[data.messages.length - 1].timestamp;
+            }
+          } else if (data.type === 'new_message' && data.message) {
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === data.message.id)) return prev;
+              const next = [...prev, data.message];
+              lastTimestampRef.current = data.message.timestamp;
+              return next;
+            });
+          }
+        } catch (err) {}
+      };
+
+      ws.onclose = () => setIsConnected(false);
+      ws.onerror = () => setIsConnected(false);
+    } catch (e) {}
 
     return () => {
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      clearInterval(pollInterval);
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
+      clearInterval(pollTimer);
+      if (socketRef.current) socketRef.current.close();
     };
   }, []);
 
@@ -141,40 +144,47 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
     if (!textToSend) return;
 
     setInputText('');
-
     const senderRole = currentSender.toLowerCase().includes('leslye') ? 'leslye' : 'chif3n';
 
-    // 1. Try sending over WebSocket
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(
-        JSON.stringify({
-          type: 'send_message',
+    // 1. Optimistic Local Update (Appears instantly on sender's screen)
+    const optimisticMessage: LiveLoveMessage = {
+      id: `scroll-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      sender: currentSender,
+      senderRole,
+      text: textToSend,
+      timestamp: Date.now()
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+    lastTimestampRef.current = optimisticMessage.timestamp;
+
+    // 2. Send to backend REST API (Guaranteed persistent delivery across all networks)
+    try {
+      await fetch('/api/scrolls', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           sender: currentSender,
           senderRole,
           text: textToSend
         })
-      );
-    } else {
-      // 2. Fallback to POST /api/scrolls
+      });
+    } catch (err) {
+      console.error('Error posting live scroll:', err);
+    }
+
+    // 3. Also send over WebSocket if open
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       try {
-        const res = await fetch('/api/scrolls', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        socketRef.current.send(
+          JSON.stringify({
+            type: 'send_message',
             sender: currentSender,
             senderRole,
             text: textToSend
           })
-        });
-        if (res.ok) {
-          const json = await res.json();
-          if (json.message) {
-            setMessages((prev) => [...prev, json.message]);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to post love scroll:', err);
-      }
+        );
+      } catch (e) {}
     }
   };
 
@@ -210,7 +220,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
               <span className="font-cinzel text-xs font-bold text-white uppercase tracking-wider truncate">
                 Live Love Scrolls
               </span>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" title="Live real-time link active" />
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" title="Live sync running every second" />
             </div>
             <p className="text-[10px] text-amber-300 truncate font-mono">
               Direct Demigod & Maomao Parchment
@@ -218,7 +228,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           {/* Sender Toggle */}
           <select
             value={currentSender}
