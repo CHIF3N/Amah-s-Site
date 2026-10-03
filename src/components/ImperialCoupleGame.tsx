@@ -23,71 +23,17 @@ import {
   Flame,
   RefreshCw,
   Smartphone,
-  Globe
+  Globe,
+  Shuffle,
+  Eye,
+  Send,
+  Cloud
 } from 'lucide-react';
-import { subscribeToArcadeCloud, syncArcadeToCloud } from '../services/firebase';
-
-interface ArcadePresence {
-  chif3n: boolean;
-  leslye: boolean;
-  lastPingChif3n: number;
-  lastPingLeslye: number;
-}
-
-interface BoardGameState {
-  board: (string | null)[][];
-  mode: 'tictactoe' | 'gomoku';
-  gridSize: number;
-  currentTurn: 'chif3n' | 'leslye';
-  winner: 'chif3n' | 'leslye' | 'draw' | null;
-  scores: { chif3n: number; leslye: number; ties: number };
-  lastMove: { row: number; col: number; player: string } | null;
-}
-
-interface TriviaQuestion {
-  id: string;
-  question: string;
-  options: string[];
-  correctIndex: number;
-  category: string;
-  difficulty: string;
-  funFact: string;
-}
-
-interface TriviaGameState {
-  questionIndex: number;
-  totalQuestions: number;
-  currentQuestion: TriviaQuestion;
-  answers: { chif3n: number | null; leslye: number | null };
-  scores: { chif3n: number; leslye: number };
-  revealed: boolean;
-  roundWinner: string | null;
-}
-
-interface AlchemyCard {
-  id: number;
-  symbol: string;
-  herbName: string;
-  isMatched: boolean;
-  matchedBy?: string;
-}
-
-interface AlchemyGameState {
-  cards: AlchemyCard[];
-  flippedIndices: number[];
-  currentTurn: 'chif3n' | 'leslye';
-  scores: { chif3n: number; leslye: number };
-  winner: 'chif3n' | 'leslye' | 'draw' | null;
-}
-
-interface ArcadeState {
-  activeGame: 'board' | 'trivia' | 'alchemy';
-  boardGame: BoardGameState;
-  triviaGame: TriviaGameState;
-  alchemyGame: AlchemyGameState;
-  presence: ArcadePresence;
-  lastUpdated: number;
-}
+import {
+  subscribeToActiveArcadeSession,
+  updateActiveArcadeSession,
+  ArcadeCloudState
+} from '../services/firebase';
 
 interface ImperialCoupleGameProps {
   isOpen: boolean;
@@ -95,1145 +41,993 @@ interface ImperialCoupleGameProps {
   onOpenLoginModal?: () => void;
 }
 
-const TRIVIA_BANK: TriviaQuestion[] = [
+// Telepathy Question Bank
+const TELEPATHY_PROMPTS = [
+  {
+    id: 'tel-1',
+    prompt: 'Pick our ultimate date night anime snack craving:',
+    options: ['Boba Tea & Mochi 🧋', 'Crispy Popcorn & Melted Butter 🍿', 'Hot Steaming Ramen 🍜', 'Assorted Sushi & Matcha 🍣']
+  },
+  {
+    id: 'tel-2',
+    prompt: 'Which Maomao poison-testing habit is the cutest?',
+    options: ['Ecstatic blushing when eating venom 🧪', 'Examining Jinshi like a weird bug 🐛', 'Testing Sir Chif3n’s snacks first 👑', 'Hiding mysterious herbs in her sleeves 🌿']
+  },
+  {
+    id: 'tel-3',
+    prompt: 'Our next fantasy romantic getaway:',
+    options: ['Mountain Onsen Hot Springs ♨️', 'Kyoto Cherry Blossom Alley 🌸', 'Imperial Palace Garden Pavilion 🏯', 'Cozy Starlit Cabin in the Woods 🌌']
+  },
+  {
+    id: 'tel-4',
+    prompt: 'If Sir Chif3n casts a demigod blessing on Lady Leslye, what is it?',
+    options: ['Instant Stress Relief & Shoulder Massage ✨', 'Infinite Supply of Rare Herbal Teas 🍵', 'Emergency 10-Hour Blanket Burrito 🌯', 'Spoil-Free Anime Viewing Protection 🛡️']
+  },
+  {
+    id: 'tel-5',
+    prompt: 'Favorite anime genre for our couple cuddle watch:',
+    options: ['Imperial Mystery & Romance 🍵', 'Fantasy & Emotional Journeys 🪄', 'Slice of Life & Comedy 🌸', 'High Octane Shonen & Hype 🔥']
+  }
+];
+
+// Alchemy Ingredients for Potion Craft
+interface PotionIngredient {
+  id: string;
+  name: string;
+  icon: string;
+  element: 'Yin' | 'Yang' | 'Wood' | 'Gold';
+}
+
+const ALCHEMY_INGREDIENTS: PotionIngredient[] = [
+  { id: 'dragon-jade', name: 'Dragon Jade', icon: '🐉', element: 'Yang' },
+  { id: 'moon-orchid', name: 'Moon Orchid', icon: '🌸', element: 'Yin' },
+  { id: 'phoenix-feather', name: 'Phoenix Feather', icon: '🪶', element: 'Yang' },
+  { id: 'golden-lotus', name: 'Golden Lotus', icon: '🪷', element: 'Gold' },
+  { id: 'wolfberry', name: 'Wolfberry Root', icon: '🍒', element: 'Wood' },
+  { id: 'starlight-dew', name: 'Starlight Dew', icon: '✨', element: 'Yin' }
+];
+
+const POTION_RECIPES: Record<string, { name: string; effect: string; color: string }> = {
+  'dragon-jade+moon-orchid': { name: 'Remedy of Clarity & Vision', effect: 'Cleanses the mind and restores eyes after 5 hours of anime binge-watching.', color: 'from-emerald-500 to-teal-400' },
+  'phoenix-feather+golden-lotus': { name: 'Elixir of Immortal Devotion', effect: 'Binds Sir Chif3n & Lady Leslye in eternal demigod love.', color: 'from-amber-500 to-rose-500' },
+  'wolfberry+starlight-dew': { name: 'Maomao’s Herbal Restorative', effect: 'Dissolves all fatigue and unlocks immediate cuddle privileges.', color: 'from-purple-500 to-indigo-400' },
+  'dragon-jade+golden-lotus': { name: 'Imperial Sovereignty Draft', effect: 'Grants royal authority over the snack bowl and remote control.', color: 'from-yellow-400 to-amber-600' }
+};
+
+// Anime Silhouette Characters
+const SILHOUETTE_TARGETS = [
+  {
+    id: 'maomao',
+    name: 'Maomao',
+    anime: 'The Apothecary Diaries',
+    hints: [
+      'Obsessed with tasting toxins and rare herbs',
+      'Works in the imperial rear palace',
+      'Has deliberate chemical scars on her left arm',
+      'Looks at handsome officials with profound deadpan pity'
+    ]
+  },
+  {
+    id: 'frieren',
+    name: 'Frieren',
+    anime: "Frieren: Beyond Journey's End",
+    hints: [
+      'An elven mage who defeated the Demon King',
+      'Loves collecting useless folk magic grimoires',
+      'Wakes up past noon and gets eaten by mimics',
+      'Traveled with hero Himmel for 10 years'
+    ]
+  },
+  {
+    id: 'jinshi',
+    name: 'Jinshi',
+    anime: 'The Apothecary Diaries',
+    hints: [
+      'Has celestial, breathtaking good looks that charm anyone',
+      'Secretly holds immense royal imperial bloodline rank',
+      'Constantly teased and ignored by an apothecary girl',
+      'Accompanied by faithful guard Gaoshun'
+    ]
+  }
+];
+
+// Anime Trivia Questions
+const TRIVIA_QUESTIONS = [
   {
     id: 't-1',
     question: 'In The Apothecary Diaries, what rare physical trait is Maomao famously known for having on her arm?',
-    options: ['A lotus birthmark', 'Scars from deliberate poison testing', 'An imperial jade tattoo', 'A golden dragon burn'],
-    correctIndex: 1,
-    category: 'The Apothecary Diaries',
-    difficulty: 'Imperial Court Hygiene',
+    options: ['A golden dragon brand', 'Chemical scars from self-administered poison testing', 'An imperial lotus tattoo', 'A jade phoenix birthmark'],
+    correct: 1,
     funFact: 'Maomao tested snake venom, powdered mercury, and various herbs directly on herself to study their effects!'
   },
   {
     id: 't-2',
-    question: "What is Sir Chif3n's primary demigod duty whenever Lady Leslye is watching an intense cliffhanger episode?",
-    options: ['Sample all snacks for poison & give shoulder massages', 'Leave the room silently', 'Pause and spoil the ending', 'Refuse to share popcorn'],
-    correctIndex: 0,
-    category: 'Couple Sacred Laws',
-    difficulty: 'Demigod Protocol',
-    funFact: 'Sacred Decree #001 states Sir Chif3n must ensure 100% boba and blanket readiness at all times.'
+    question: "What is Sir Chif3n's primary demigod duty whenever Lady Leslye has had a tiring mortal week?",
+    options: ['Provide emergency blanket burrito & test all snacks for poison', 'Ignore her and play video games', 'Tell her to do chores', 'Spoil the anime ending'],
+    correct: 0,
+    funFact: 'Sacred Law #001 states Sir Chif3n must ensure 100% boba and blanket readiness at all times.'
   },
   {
     id: 't-3',
-    question: 'What dangerous substance hidden in face powder was poisoning the imperial consorts and their infants?',
-    options: ['Arsenic', 'White Lead', 'Wolfsbane', 'Ground Asbestos'],
-    correctIndex: 1,
-    category: 'The Apothecary Diaries',
-    difficulty: 'Palace Mystery',
-    funFact: 'Lead was commonly used in historical cosmetic powders, causing severe toxicity in imperial nurseries.'
+    question: "In Frieren: Beyond Journey's End, what flower was hero Himmel's hometown known for?",
+    options: ['Mirrored Lotus', 'Blue Moon Grass', 'Dragon Orchid', 'Starlight Rose'],
+    correct: 0,
+    funFact: 'Himmel chose the Mirrored Lotus ring for Frieren, which symbolises eternal, unending devotion.'
   },
   {
     id: 't-4',
-    question: "In Frieren: Beyond Journey's End, how many years does Frieren's new journey retrace Himmel's hero party quest?",
-    options: ['10 years', '20 years', '50 years', '100 years'],
-    correctIndex: 0,
-    category: 'Frieren Lore',
-    difficulty: 'Heroic Journey',
-    funFact: "The original adventure took exactly 10 years, which Frieren initially considered 'only a mere decade'."
+    question: 'When Jinshi attempts to use his heavenly handsome charms on Maomao, how does she look at him?',
+    options: ['With profound deadpan disgust, like inspecting a slug', 'She faints from attraction', 'She writes a love poem', 'She requests an imperial marriage'],
+    correct: 0,
+    funFact: 'Maomao’s cold deadpan disgust completely captivates Jinshi since no one else treats him like a bug!'
   },
   {
     id: 't-5',
-    question: 'Whenever Jinshi tries to use his heavenly handsome charms on Maomao, how does she usually react?',
-    options: ['She faints from attraction', 'She gazes like inspecting a strange caterpillar or toad', 'She writes a love poem', 'She requests an imperial marriage'],
-    correctIndex: 1,
-    category: 'The Apothecary Diaries',
-    difficulty: 'Rear Palace Comedy',
-    funFact: "Jinshi is so accustomed to everyone falling for him that Maomao's cold deadpan disgust completely fascinates him!"
-  },
-  {
-    id: 't-6',
-    question: 'What sweet herbal ingredient does Maomao often infuse into soothing teas for throat ailments?',
-    options: ['Licorice Root (Gan Cao)', 'Spicy Szechuan Peppercorn', 'Bitter Melon', 'Crushed Pine Needle'],
-    correctIndex: 0,
-    category: 'Herbal Medicine',
-    difficulty: 'Imperial Pharmacology',
-    funFact: 'Licorice root naturally sweetens remedies while harmonizing harsh pharmacological properties of other herbs.'
-  },
-  {
-    id: 't-7',
-    question: 'When Sir Chif3n claims his love for Lady Leslye has zero toxicity, what is the scientific purity percentage?',
-    options: ['99.9%', '100% Pure Celestial Essence', 'Depends on snack supplies', '50/50'],
-    correctIndex: 1,
-    category: 'Couple Sacred Laws',
-    difficulty: 'Demigod Vows',
-    funFact: 'Imperial Physician Records confirm Sir Chif3n is permanently and incurably infatuated with Lady Leslye.'
-  },
-  {
-    id: 't-8',
-    question: 'In The Apothecary Diaries, what prized delicacy from the South Sea did Maomao analyze at the banquet for food allergies?',
-    options: ['Poisoned Pufferfish', 'Sea Cucumber & Prawns', 'Caviar Tartlets', 'Salted Dried Squid'],
-    correctIndex: 1,
-    category: 'The Apothecary Diaries',
-    difficulty: 'Palace Forensics',
-    funFact: 'Maomao saved an official by discovering he had a severe crustacean/shellfish anaphylactic reaction, not poison!'
+    question: 'What dangerous cosmetic substance was poisoning the imperial concubines and their infants?',
+    options: ['Powdered White Lead', 'Nightshade Berries', 'Wolfsbane Incense', 'Ground Asbestos'],
+    correct: 0,
+    funFact: 'Lead powder was commonly used for imperial porcelain-white skin cosmetics in ancient courts.'
   }
 ];
 
-const ALCHEMY_BASE_HERBS = [
-  { symbol: '🧪', herbName: 'Angelica Root' },
-  { symbol: '🌸', herbName: 'Royal Lotus' },
-  { symbol: '🌿', herbName: 'Sweet Licorice' },
-  { symbol: '🍄', herbName: 'Snow Fungus' },
-  { symbol: '🍂', herbName: 'Osmanthus' },
-  { symbol: '🏺', herbName: 'Ox-Bezoar' }
-];
-
-function generateShuffledCards(): AlchemyCard[] {
-  const pairs = ALCHEMY_BASE_HERBS.flatMap((h, i) => [
-    { id: i * 2, symbol: h.symbol, herbName: h.herbName, isMatched: false },
-    { id: i * 2 + 1, symbol: h.symbol, herbName: h.herbName, isMatched: false }
-  ]);
-  // Fisher-Yates shuffle
-  for (let i = pairs.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
-  }
-  return pairs;
-}
-
-function checkBoardWinner(board: (string | null)[][], size: number, winLength: number): 'chif3n' | 'leslye' | 'draw' | null {
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      const p = board[r][c];
-      if (!p) continue;
-
-      // Horizontal
-      if (c + winLength <= size) {
-        let win = true;
-        for (let k = 0; k < winLength; k++) if (board[r][c + k] !== p) { win = false; break; }
-        if (win) return p as any;
-      }
-      // Vertical
-      if (r + winLength <= size) {
-        let win = true;
-        for (let k = 0; k < winLength; k++) if (board[r + k][c] !== p) { win = false; break; }
-        if (win) return p as any;
-      }
-      // Diagonal down-right
-      if (r + winLength <= size && c + winLength <= size) {
-        let win = true;
-        for (let k = 0; k < winLength; k++) if (board[r + k][c + k] !== p) { win = false; break; }
-        if (win) return p as any;
-      }
-      // Diagonal up-right
-      if (r - winLength + 1 >= 0 && c + winLength <= size) {
-        let win = true;
-        for (let k = 0; k < winLength; k++) if (board[r - k][c + k] !== p) { win = false; break; }
-        if (win) return p as any;
-      }
-    }
-  }
-  const isFull = board.every((row) => row.every((cell) => cell !== null));
-  if (isFull) return 'draw';
-  return null;
-}
-
-const DEFAULT_ARCADE_STATE: ArcadeState = {
-  activeGame: 'board',
-  boardGame: {
-    board: [
+// Initial Cloud Arcade State
+const DEFAULT_CLOUD_STATE: ArcadeCloudState = {
+  gameId: 'tic-tac-toe',
+  turn: 'Chif3n',
+  scores: { Chif3n: 0, Leslye: 0 },
+  winner: null,
+  lastMove: { player: 'System', action: 'Session Initialized', timestamp: Date.now() },
+  boardState: {
+    // TicTacToe / Gomoku board
+    grid: [
       [null, null, null],
       [null, null, null],
       [null, null, null]
     ],
-    mode: 'tictactoe',
-    gridSize: 3,
-    currentTurn: 'chif3n',
-    winner: null,
-    scores: { chif3n: 0, leslye: 0, ties: 0 },
-    lastMove: null
-  },
-  triviaGame: {
-    questionIndex: 0,
-    totalQuestions: TRIVIA_BANK.length,
-    currentQuestion: TRIVIA_BANK[0],
-    answers: { chif3n: null, leslye: null },
-    scores: { chif3n: 0, leslye: 0 },
-    revealed: false,
-    roundWinner: null
-  },
-  alchemyGame: {
-    cards: generateShuffledCards(),
-    flippedIndices: [],
-    currentTurn: 'chif3n',
-    scores: { chif3n: 0, leslye: 0 },
-    winner: null
-  },
-  presence: {
-    chif3n: true,
-    leslye: true,
-    lastPingChif3n: Date.now(),
-    lastPingLeslye: Date.now()
-  },
-  lastUpdated: Date.now()
+    // Telepathy state
+    telepathyPromptIdx: 0,
+    telepathyChoices: { Chif3n: null, Leslye: null },
+    telepathyRevealed: false,
+    // Potion Craft state
+    potionSlots: [],
+    craftedPotion: null,
+    // Silhouette state
+    silhouetteIdx: 0,
+    revealedHintCount: 1,
+    silhouetteSolved: false,
+    // Trivia state
+    triviaQuestionIdx: 0,
+    triviaAnswers: { Chif3n: null, Leslye: null },
+    triviaRevealed: false
+  }
 };
-
-function getInitialArcadeState(): ArcadeState {
-  try {
-    const saved = localStorage.getItem('imperial_arcade_state');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && parsed.boardGame && parsed.triviaGame && parsed.alchemyGame) {
-        return parsed;
-      }
-    }
-  } catch (e) {}
-  return DEFAULT_ARCADE_STATE;
-}
 
 export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
   isOpen,
   onClose,
   onOpenLoginModal
 }) => {
-  // Always initialize with guaranteed state so games load immediately with ZERO blank screens
-  const [arcade, setArcade] = useState<ArcadeState>(() => getInitialArcadeState());
-  const [activeTab, setActiveTab] = useState<'board' | 'trivia' | 'alchemy'>(() => arcade.activeGame || 'board');
-  const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [syncStatus, setSyncStatus] = useState<string>('Ready');
-
-  // Player identity
-  const [myRole, setMyRole] = useState<'chif3n' | 'leslye'>(() => {
+  // Active player role on this device
+  const [myRole, setMyRole] = useState<'Chif3n' | 'Leslye'>(() => {
     try {
-      const saved = localStorage.getItem('leslye_active_user') || localStorage.getItem('leslye_game_role');
-      if (saved === 'chif3n' || saved === 'leslye') return saved;
+      const saved = localStorage.getItem('leslye_active_user');
+      if (saved === 'leslye') return 'Leslye';
     } catch (e) {}
-    return 'chif3n';
+    return 'Chif3n';
   });
 
-  // Pass and play toggle for when playing together on one phone
-  const [passAndPlay, setPassAndPlay] = useState<boolean>(true);
+  const [passAndPlay, setPassAndPlay] = useState<boolean>(false);
+  const [session, setSession] = useState<ArcadeCloudState>(DEFAULT_CLOUD_STATE);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
-  // Broadcast channel for instantaneous cross-tab/cross-window local sync
-  const channelRef = useRef<BroadcastChannel | null>(null);
-
-  // Web Audio sound synthesizer
-  const playSfx = (type: 'move' | 'win' | 'match' | 'trivia') => {
+  // Sound generator
+  const playSound = (freq = 440, type: OscillatorType = 'sine', duration = 0.15) => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
       const ctx = new AudioCtx();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-
-      if (type === 'move') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(440, ctx.currentTime);
-        gain.gain.setValueAtTime(0.08, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.15);
-      } else if (type === 'match') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(523.25, ctx.currentTime);
-        gain.gain.setValueAtTime(0.1, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.3);
-      } else if (type === 'win') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-        gain.gain.setValueAtTime(0.12, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.5);
-      } else if (type === 'trivia') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(659.25, ctx.currentTime);
-        gain.gain.setValueAtTime(0.09, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.2);
-      }
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
     } catch (e) {}
   };
 
-  // Save arcade state to local storage, broadcast channel, and Cloud Firestore!
-  const persistAndBroadcast = (newState: ArcadeState) => {
-    setArcade(newState);
-    try {
-      localStorage.setItem('imperial_arcade_state', JSON.stringify(newState));
-      if (channelRef.current) {
-        channelRef.current.postMessage({ type: 'arcade_update', arcade: newState });
-      }
-    } catch (e) {}
-
-    // Worldwide cloud sync to her phone/laptop via Cloud Firestore
-    syncArcadeToCloud(newState).then((ok) => {
-      if (ok) setSyncStatus('Cloud Live');
-    });
-  };
-
-  // Fetch latest state from server (with graceful error handling)
-  const fetchArcadeState = async () => {
-    try {
-      const res = await fetch('/api/game');
-      if (res.ok) {
-        const text = await res.text();
-        // Guard against html response from 404 or SPA redirects
-        if (text.startsWith('{')) {
-          const json = JSON.parse(text);
-          if (json.arcade) {
-            setArcade(json.arcade);
-            try {
-              localStorage.setItem('imperial_arcade_state', JSON.stringify(json.arcade));
-            } catch (e) {}
-            setSyncStatus('Cloud Live');
-          }
-        }
-      }
-    } catch (e) {
-      // Offline or Netlify static fallback is fully supported!
-      setSyncStatus('Local Sanctum');
-    }
-  };
-
-  // Ping online presence
-  const sendPresencePing = async () => {
-    try {
-      await fetch('/api/game/ping', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ player: myRole })
-      });
-    } catch (e) {}
-  };
-
-  // Setup broadcast channel, background sync & fallback
+  // Subscribe to Cloud Firestore activeSession
   useEffect(() => {
     if (!isOpen) return;
 
-    // 1. Initialize BroadcastChannel for 0ms same-origin multi-tab sync
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      channelRef.current = new BroadcastChannel('imperial_couple_game_channel');
-      channelRef.current.onmessage = (event) => {
-        if (event.data?.type === 'arcade_update' && event.data.arcade) {
-          setArcade(event.data.arcade);
-        }
-      };
-    }
-
-    // 2. Real-time Cloud Firestore subscription: Updates instantly across different phones & laptops
-    const unsubscribeCloud = subscribeToArcadeCloud((cloudArcade) => {
-      if (cloudArcade && cloudArcade.boardGame) {
-        setArcade((prev) => {
-          if (!prev || (cloudArcade.lastUpdated && cloudArcade.lastUpdated >= (prev.lastUpdated || 0))) {
-            return cloudArcade;
-          }
-          return prev;
-        });
-        setSyncStatus('Cloud Live');
+    const unsubscribe = subscribeToActiveArcadeSession((cloudData) => {
+      if (cloudData && cloudData.gameId) {
+        setSession(cloudData);
+        playSound(523, 'triangle', 0.1);
       }
     });
 
-    // 3. Fetch from backend if available
-    fetchArcadeState();
-    sendPresencePing();
-
-    const interval = setInterval(() => {
-      if (!passAndPlay) {
-        fetchArcadeState();
-      }
-    }, 2000);
-
     return () => {
-      unsubscribeCloud();
-      clearInterval(interval);
-      if (channelRef.current) {
-        channelRef.current.close();
+      unsubscribe();
+    };
+  }, [isOpen]);
+
+  const isMyTurn = passAndPlay || session.turn === myRole;
+
+  // Generic Cloud Dispatcher
+  const dispatchStateUpdate = async (nextState: Partial<ArcadeCloudState>) => {
+    const merged: ArcadeCloudState = {
+      ...session,
+      ...nextState,
+      lastMove: {
+        player: myRole,
+        action: nextState.lastMove?.action || 'Move Made',
+        timestamp: Date.now()
       }
     };
-  }, [isOpen, passAndPlay]);
 
-  const handleSelectRole = (role: 'chif3n' | 'leslye') => {
-    setMyRole(role);
-    try {
-      localStorage.setItem('leslye_active_user', role);
-      localStorage.setItem('leslye_game_role', role);
-    } catch (e) {}
-    sendPresencePing();
+    setSession(merged);
+    setIsSyncing(true);
+    await updateActiveArcadeSession(merged);
+    setIsSyncing(false);
   };
 
-  const handleSwitchTab = (gameType: 'board' | 'trivia' | 'alchemy') => {
-    setActiveTab(gameType);
-    const updated: ArcadeState = {
-      ...arcade,
-      activeGame: gameType,
-      lastUpdated: Date.now()
-    };
-    persistAndBroadcast(updated);
+  // Switch Game Mode
+  const switchGame = async (gameId: string) => {
+    let newBoardState = { ...session.boardState };
 
-    try {
-      fetch('/api/game/switch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameType })
-      }).catch(() => {});
-    } catch (e) {}
-  };
-
-  // ==========================================
-  // GAME 1: BOARD DUEL (TIC-TAC-TOE & GOMOKU)
-  // ==========================================
-  const handleBoardCellClick = (row: number, col: number) => {
-    const bg = arcade.boardGame;
-    if (bg.winner !== null || bg.board[row][col] !== null) return;
-    if (!passAndPlay && bg.currentTurn !== myRole) return;
-
-    const movingPlayer = passAndPlay ? bg.currentTurn : myRole;
-    playSfx('move');
-
-    // Create updated board
-    const newBoard = bg.board.map((r, rIdx) =>
-      r.map((c, cIdx) => (rIdx === row && cIdx === col ? movingPlayer : c))
-    );
-
-    const winLength = bg.mode === 'gomoku' ? 4 : 3;
-    const winner = checkBoardWinner(newBoard, bg.gridSize, winLength);
-
-    const newScores = { ...bg.scores };
-    if (winner === 'chif3n') {
-      newScores.chif3n += 1;
-      playSfx('win');
-    } else if (winner === 'leslye') {
-      newScores.leslye += 1;
-      playSfx('win');
-    } else if (winner === 'draw') {
-      newScores.ties += 1;
-      playSfx('match');
+    if (gameId === 'tic-tac-toe') {
+      newBoardState.grid = [
+        [null, null, null],
+        [null, null, null],
+        [null, null, null]
+      ];
+    } else if (gameId === 'gomoku') {
+      newBoardState.grid = Array.from({ length: 8 }, () => Array(8).fill(null));
+    } else if (gameId === 'couples-telepathy') {
+      newBoardState.telepathyChoices = { Chif3n: null, Leslye: null };
+      newBoardState.telepathyRevealed = false;
+    } else if (gameId === 'potion-craft') {
+      newBoardState.potionSlots = [];
+      newBoardState.craftedPotion = null;
+    } else if (gameId === 'silhouette-duel') {
+      newBoardState.revealedHintCount = 1;
+      newBoardState.silhouetteSolved = false;
+    } else if (gameId === 'trivia') {
+      newBoardState.triviaAnswers = { Chif3n: null, Leslye: null };
+      newBoardState.triviaRevealed = false;
     }
 
-    const nextTurn = movingPlayer === 'chif3n' ? 'leslye' : 'chif3n';
-
-    const updatedState: ArcadeState = {
-      ...arcade,
-      boardGame: {
-        ...bg,
-        board: newBoard,
-        currentTurn: nextTurn,
-        winner,
-        scores: newScores,
-        lastMove: { row, col, player: movingPlayer }
-      },
-      lastUpdated: Date.now()
-    };
-
-    persistAndBroadcast(updatedState);
-
-    // Optional sync to server
-    try {
-      fetch('/api/game/board/move', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ row, col, player: movingPlayer })
-      }).catch(() => {});
-    } catch (e) {}
+    await dispatchStateUpdate({
+      gameId,
+      turn: 'Chif3n',
+      winner: null,
+      boardState: newBoardState,
+      lastMove: { player: myRole, action: `Started ${gameId}`, timestamp: Date.now() }
+    });
   };
 
-  const handleResetBoard = () => {
-    const size = arcade.boardGame.gridSize;
-    const cleanBoard = Array.from({ length: size }, () => Array(size).fill(null));
+  // --- 1. TIC-TAC-TOE & GOMOKU LOGIC ---
+  const handleBoardClick = async (r: number, c: number) => {
+    if (!isMyTurn || session.winner || session.boardState.grid[r][c] !== null) return;
 
-    const updated: ArcadeState = {
-      ...arcade,
-      boardGame: {
-        ...arcade.boardGame,
-        board: cleanBoard,
-        winner: null,
-        lastMove: null
-      },
-      lastUpdated: Date.now()
-    };
-    persistAndBroadcast(updated);
+    const newGrid = session.boardState.grid.map((row: any[]) => [...row]);
+    const mark = session.turn === 'Chif3n' ? '👑' : '🌿';
+    newGrid[r][c] = mark;
 
-    try {
-      fetch('/api/game/board/reset', { method: 'POST' }).catch(() => {});
-    } catch (e) {}
-  };
+    // Check winner
+    const winLength = session.gameId === 'gomoku' ? 5 : 3;
+    const winnerMark = checkBoardWinner(newGrid, winLength);
 
-  const handleToggleBoardMode = (mode: 'tictactoe' | 'gomoku') => {
-    const size = mode === 'gomoku' ? 6 : 3;
-    const cleanBoard = Array.from({ length: size }, () => Array(size).fill(null));
+    let nextTurn: 'Chif3n' | 'Leslye' = session.turn === 'Chif3n' ? 'Leslye' : 'Chif3n';
+    let winner: string | null = null;
+    let scores = { ...session.scores };
 
-    const updated: ArcadeState = {
-      ...arcade,
-      boardGame: {
-        ...arcade.boardGame,
-        mode,
-        gridSize: size,
-        board: cleanBoard,
-        winner: null,
-        lastMove: null
-      },
-      lastUpdated: Date.now()
-    };
-    persistAndBroadcast(updated);
-
-    try {
-      fetch('/api/game/board/mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode })
-      }).catch(() => {});
-    } catch (e) {}
-  };
-
-  // ==========================================
-  // GAME 2: ANIME & APOTHECARY TRIVIA
-  // ==========================================
-  const handleAnswerTrivia = (answerIndex: number) => {
-    const tg = arcade.triviaGame;
-    if (tg.revealed) return;
-
-    playSfx('trivia');
-
-    const answeringPlayer = passAndPlay
-      ? tg.answers.chif3n === null
-        ? 'chif3n'
-        : 'leslye'
-      : myRole;
-
-    const newAnswers = { ...tg.answers, [answeringPlayer]: answerIndex };
-    let revealed = false;
-    let roundWinner = null;
-    const newScores = { ...tg.scores };
-
-    // In pass and play or when both answered, reveal!
-    if (passAndPlay) {
-      if (newAnswers.chif3n !== null && newAnswers.leslye !== null) {
-        revealed = true;
+    if (winnerMark) {
+      if (winnerMark === 'draw') {
+        winner = 'Draw';
+      } else {
+        winner = winnerMark === '👑' ? 'Chif3n' : 'Leslye';
+        scores[winner as 'Chif3n' | 'Leslye'] += 1;
+        playSound(659, 'triangle', 0.3);
       }
     } else {
-      if (newAnswers.chif3n !== null && newAnswers.leslye !== null) {
-        revealed = true;
-      }
+      playSound(440, 'sine', 0.12);
     }
 
-    if (revealed) {
-      const correct = tg.currentQuestion.correctIndex;
-      if (newAnswers.chif3n === correct && newAnswers.leslye === correct) {
-        newScores.chif3n += 10;
-        newScores.leslye += 10;
-        roundWinner = 'tie';
-        playSfx('win');
-      } else if (newAnswers.chif3n === correct) {
-        newScores.chif3n += 10;
-        roundWinner = 'chif3n';
-        playSfx('win');
-      } else if (newAnswers.leslye === correct) {
-        newScores.leslye += 10;
-        roundWinner = 'leslye';
-        playSfx('win');
-      } else {
-        roundWinner = 'none';
-      }
-    }
-
-    const updated: ArcadeState = {
-      ...arcade,
-      triviaGame: {
-        ...tg,
-        answers: newAnswers,
-        scores: newScores,
-        revealed,
-        roundWinner
-      },
-      lastUpdated: Date.now()
-    };
-
-    persistAndBroadcast(updated);
-
-    try {
-      fetch('/api/game/trivia/answer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ player: answeringPlayer, answerIndex })
-      }).catch(() => {});
-    } catch (e) {}
+    await dispatchStateUpdate({
+      boardState: { ...session.boardState, grid: newGrid },
+      turn: nextTurn,
+      winner,
+      scores,
+      lastMove: { player: myRole, action: `Placed mark at (${r+1}, ${c+1})`, timestamp: Date.now() }
+    });
   };
 
-  const handleNextTrivia = () => {
-    const tg = arcade.triviaGame;
-    const nextIdx = (tg.questionIndex + 1) % TRIVIA_BANK.length;
-
-    const updated: ArcadeState = {
-      ...arcade,
-      triviaGame: {
-        ...tg,
-        questionIndex: nextIdx,
-        currentQuestion: TRIVIA_BANK[nextIdx],
-        answers: { chif3n: null, leslye: null },
-        revealed: false,
-        roundWinner: null
-      },
-      lastUpdated: Date.now()
-    };
-    persistAndBroadcast(updated);
-
-    try {
-      fetch('/api/game/trivia/next', { method: 'POST' }).catch(() => {});
-    } catch (e) {}
-  };
-
-  // ==========================================
-  // GAME 3: ALCHEMY HERB MEMORY MATCH-2
-  // ==========================================
-  const handleAlchemyFlip = (cardIndex: number) => {
-    const ag = arcade.alchemyGame;
-    if (ag.winner !== null) return;
-    if (!passAndPlay && ag.currentTurn !== myRole) return;
-    if (ag.cards[cardIndex].isMatched || ag.flippedIndices.includes(cardIndex)) return;
-    if (ag.flippedIndices.length >= 2) return;
-
-    playSfx('move');
-
-    const flippingPlayer = passAndPlay ? ag.currentTurn : myRole;
-    const newFlipped = [...ag.flippedIndices, cardIndex];
-
-    const updatedAg: AlchemyGameState = {
-      ...ag,
-      flippedIndices: newFlipped
-    };
-
-    // If 2 cards are now flipped, evaluate match!
-    if (newFlipped.length === 2) {
-      const [idx1, idx2] = newFlipped;
-      const card1 = ag.cards[idx1];
-      const card2 = ag.cards[idx2];
-
-      if (card1.symbol === card2.symbol) {
-        // MATCH!
-        playSfx('match');
-        const updatedCards = ag.cards.map((c, i) =>
-          i === idx1 || i === idx2 ? { ...c, isMatched: true, matchedBy: flippingPlayer } : c
-        );
-        const newScores = {
-          ...ag.scores,
-          [flippingPlayer]: ag.scores[flippingPlayer] + 10
-        };
-
-        let winner: 'chif3n' | 'leslye' | 'draw' | null = null;
-        if (updatedCards.every((c) => c.isMatched)) {
-          if (newScores.chif3n > newScores.leslye) winner = 'chif3n';
-          else if (newScores.leslye > newScores.chif3n) winner = 'leslye';
-          else winner = 'draw';
-          playSfx('win');
+  const checkBoardWinner = (grid: any[][], winLen: number): string | null => {
+    const size = grid.length;
+    for (let r = 0; r < size; r++) {
+      for (let c = 0; c < size; c++) {
+        const p = grid[r][c];
+        if (!p) continue;
+        // Horizontal
+        if (c + winLen <= size && grid[r].slice(c, c + winLen).every((cell: any) => cell === p)) return p;
+        // Vertical
+        if (r + winLen <= size) {
+          let win = true;
+          for (let k = 0; k < winLen; k++) if (grid[r + k][c] !== p) { win = false; break; }
+          if (win) return p;
         }
-
-        updatedAg.cards = updatedCards;
-        updatedAg.scores = newScores;
-        updatedAg.flippedIndices = [];
-        updatedAg.winner = winner;
-      } else {
-        // NO MATCH: flip back after 1.1s
-        setTimeout(() => {
-          setArcade((prev) => {
-            const nextTurn = flippingPlayer === 'chif3n' ? 'leslye' : 'chif3n';
-            const state: ArcadeState = {
-              ...prev,
-              alchemyGame: {
-                ...prev.alchemyGame,
-                flippedIndices: [],
-                currentTurn: nextTurn
-              },
-              lastUpdated: Date.now()
-            };
-            persistAndBroadcast(state);
-            return state;
-          });
-        }, 1100);
+        // Diagonal Down-Right
+        if (r + winLen <= size && c + winLen <= size) {
+          let win = true;
+          for (let k = 0; k < winLen; k++) if (grid[r + k][c + k] !== p) { win = false; break; }
+          if (win) return p;
+        }
+        // Diagonal Up-Right
+        if (r - winLen + 1 >= 0 && c + winLen <= size) {
+          let win = true;
+          for (let k = 0; k < winLen; k++) if (grid[r - k][c + k] !== p) { win = false; break; }
+          if (win) return p;
+        }
       }
     }
-
-    const updatedState: ArcadeState = {
-      ...arcade,
-      alchemyGame: updatedAg,
-      lastUpdated: Date.now()
-    };
-    persistAndBroadcast(updatedState);
+    const isFull = grid.every((row: any[]) => row.every((cell) => cell !== null));
+    return isFull ? 'draw' : null;
   };
 
-  const handleResetAlchemy = () => {
-    const updated: ArcadeState = {
-      ...arcade,
-      alchemyGame: {
-        cards: generateShuffledCards(),
-        flippedIndices: [],
-        currentTurn: 'chif3n',
-        scores: { chif3n: 0, leslye: 0 },
-        winner: null
+  const resetBoard = async () => {
+    const size = session.gameId === 'gomoku' ? 8 : 3;
+    const newGrid = Array.from({ length: size }, () => Array(size).fill(null));
+    await dispatchStateUpdate({
+      boardState: { ...session.boardState, grid: newGrid },
+      turn: 'Chif3n',
+      winner: null
+    });
+  };
+
+  // --- 2. COUPLES' TELEPATHY LOGIC ---
+  const handleTelepathyChoice = async (optIdx: number) => {
+    const currentChoices = { ...session.boardState.telepathyChoices, [myRole]: optIdx };
+    const bothSubmitted = currentChoices.Chif3n !== null && currentChoices.Leslye !== null;
+
+    let scores = { ...session.scores };
+    let winner: string | null = null;
+
+    if (bothSubmitted) {
+      if (currentChoices.Chif3n === currentChoices.Leslye) {
+        scores.Chif3n += 1;
+        scores.Leslye += 1;
+        winner = 'Telepathic Soulmates! 100% Match! 💖';
+        playSound(784, 'triangle', 0.4);
+      } else {
+        winner = 'Cute Contrast! Opposite Desires 🌸';
+        playSound(392, 'sine', 0.2);
+      }
+    } else {
+      playSound(523, 'sine', 0.15);
+    }
+
+    await dispatchStateUpdate({
+      boardState: {
+        ...session.boardState,
+        telepathyChoices: currentChoices,
+        telepathyRevealed: bothSubmitted
       },
-      lastUpdated: Date.now()
-    };
-    persistAndBroadcast(updated);
+      scores,
+      winner
+    });
+  };
+
+  const nextTelepathyPrompt = async () => {
+    const nextIdx = (session.boardState.telepathyPromptIdx + 1) % TELEPATHY_PROMPTS.length;
+    await dispatchStateUpdate({
+      boardState: {
+        ...session.boardState,
+        telepathyPromptIdx: nextIdx,
+        telepathyChoices: { Chif3n: null, Leslye: null },
+        telepathyRevealed: false
+      },
+      winner: null
+    });
+  };
+
+  // --- 3. POTION CRAFT (ALCHEMY CO-OP) ---
+  const handleAddIngredient = async (ingredientId: string) => {
+    if (!isMyTurn) return;
+    const slots = [...(session.boardState.potionSlots || [])];
+    if (slots.length >= 2) return;
+
+    slots.push(ingredientId);
+    let craftedPotion = null;
+    let winner = null;
+    let scores = { ...session.scores };
+
+    if (slots.length === 2) {
+      const comboKey1 = `${slots[0]}+${slots[1]}`;
+      const comboKey2 = `${slots[1]}+${slots[0]}`;
+      craftedPotion = POTION_RECIPES[comboKey1] || POTION_RECIPES[comboKey2] || {
+        name: 'Mysterious Sparking Draught',
+        effect: 'A bubbly, experimental potion with sweet notes of peach and starlight.',
+        color: 'from-pink-500 to-rose-400'
+      };
+      scores.Chif3n += 1;
+      scores.Leslye += 1;
+      winner = 'Masterpiece Potion Brewed! 🍵✨';
+      playSound(659, 'triangle', 0.4);
+    } else {
+      playSound(440, 'sine', 0.15);
+    }
+
+    const nextTurn: 'Chif3n' | 'Leslye' = session.turn === 'Chif3n' ? 'Leslye' : 'Chif3n';
+
+    await dispatchStateUpdate({
+      boardState: {
+        ...session.boardState,
+        potionSlots: slots,
+        craftedPotion
+      },
+      turn: nextTurn,
+      winner,
+      scores
+    });
+  };
+
+  const resetCauldron = async () => {
+    await dispatchStateUpdate({
+      boardState: {
+        ...session.boardState,
+        potionSlots: [],
+        craftedPotion: null
+      },
+      turn: 'Chif3n',
+      winner: null
+    });
+  };
+
+  // --- 4. SILHOUETTE MYSTERY DUEL ---
+  const handleRevealNextHint = async () => {
+    const current = session.boardState.revealedHintCount || 1;
+    if (current < 4) {
+      await dispatchStateUpdate({
+        boardState: {
+          ...session.boardState,
+          revealedHintCount: current + 1
+        }
+      });
+      playSound(523, 'sine', 0.15);
+    }
+  };
+
+  const handleSolveSilhouette = async () => {
+    let scores = { ...session.scores };
+    scores[myRole] += 2;
+    playSound(784, 'triangle', 0.4);
+
+    await dispatchStateUpdate({
+      boardState: {
+        ...session.boardState,
+        silhouetteSolved: true,
+        revealedHintCount: 4
+      },
+      scores,
+      winner: `${myRole} Deciphered The Silhouette!`
+    });
+  };
+
+  const nextSilhouette = async () => {
+    const nextIdx = (session.boardState.silhouetteIdx + 1) % SILHOUETTE_TARGETS.length;
+    await dispatchStateUpdate({
+      boardState: {
+        ...session.boardState,
+        silhouetteIdx: nextIdx,
+        revealedHintCount: 1,
+        silhouetteSolved: false
+      },
+      winner: null
+    });
+  };
+
+  // --- 5. ANIME TRIVIA DUEL ---
+  const handleTriviaAnswer = async (optIdx: number) => {
+    const currentAnswers = { ...session.boardState.triviaAnswers, [myRole]: optIdx };
+    const bothAnswered = currentAnswers.Chif3n !== null && currentAnswers.Leslye !== null;
+
+    let scores = { ...session.scores };
+    let winner: string | null = null;
+    const currentQ = TRIVIA_QUESTIONS[session.boardState.triviaQuestionIdx || 0];
+
+    if (bothAnswered) {
+      const chif3nCorrect = currentAnswers.Chif3n === currentQ.correct;
+      const leslyeCorrect = currentAnswers.Leslye === currentQ.correct;
+
+      if (chif3nCorrect) scores.Chif3n += 1;
+      if (leslyeCorrect) scores.Leslye += 1;
+
+      if (chif3nCorrect && leslyeCorrect) {
+        winner = 'Both Sir Chif3n & Lady Leslye Answered Correctly! 🏆';
+        playSound(784, 'triangle', 0.4);
+      } else if (chif3nCorrect) {
+        winner = 'Sir Chif3n Scored The Correct Answer! 👑';
+        playSound(659, 'triangle', 0.3);
+      } else if (leslyeCorrect) {
+        winner = 'Lady Leslye Scored The Correct Answer! 🌿';
+        playSound(659, 'triangle', 0.3);
+      } else {
+        winner = 'Both Missed! The Court Physician Chuckles 🍵';
+        playSound(330, 'sine', 0.2);
+      }
+    } else {
+      playSound(523, 'sine', 0.15);
+    }
+
+    await dispatchStateUpdate({
+      boardState: {
+        ...session.boardState,
+        triviaAnswers: currentAnswers,
+        triviaRevealed: bothAnswered
+      },
+      scores,
+      winner
+    });
+  };
+
+  const nextTriviaQuestion = async () => {
+    const nextIdx = (session.boardState.triviaQuestionIdx + 1) % TRIVIA_QUESTIONS.length;
+    await dispatchStateUpdate({
+      boardState: {
+        ...session.boardState,
+        triviaQuestionIdx: nextIdx,
+        triviaAnswers: { Chif3n: null, Leslye: null },
+        triviaRevealed: false
+      },
+      winner: null
+    });
   };
 
   if (!isOpen) return null;
 
-  const boardGame = arcade.boardGame;
-  const triviaGame = arcade.triviaGame;
-  const alchemyGame = arcade.alchemyGame;
-  const presence = arcade.presence;
-
-  const isMyBoardTurn = (passAndPlay || boardGame.currentTurn === myRole) && boardGame.winner === null;
-  const isMyAlchemyTurn = (passAndPlay || alchemyGame.currentTurn === myRole) && alchemyGame.winner === null;
+  const currentTelepathy = TELEPATHY_PROMPTS[session.boardState.telepathyPromptIdx || 0];
+  const currentSilhouette = SILHOUETTE_TARGETS[session.boardState.silhouetteIdx || 0];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in overflow-y-auto">
-      <div
-        className="relative w-full max-w-xl rounded-2xl bg-gradient-to-br from-[#0c2419] via-[#05140e] to-[#140b17] border border-amber-400/50 p-5 sm:p-6 shadow-2xl space-y-4 text-center overflow-hidden my-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Top Header & Close */}
-        <div className="flex items-center justify-between border-b border-emerald-900/60 pb-3">
-          <div className="flex items-center gap-2.5 text-left">
-            <div className="p-2 rounded-xl bg-amber-400/20 text-amber-300 border border-amber-400/40">
-              <Sparkles className="w-5 h-5 animate-pulse text-amber-400" />
+    <div className="fixed inset-0 z-50 bg-[#020906]/95 backdrop-blur-xl flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
+      <div className="w-full max-w-4xl h-[92vh] bg-gradient-to-b from-[#05170f] via-[#03100a] to-[#020805] border border-emerald-500/40 rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+        {/* Header Bar */}
+        <header className="px-5 py-3.5 bg-[#03110b] border-b border-emerald-900/80 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-amber-500/20 to-emerald-500/20 border border-amber-400/50 flex items-center justify-center shadow">
+              <Trophy className="w-4 h-4 text-amber-400" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-cinzel text-[10px] font-bold text-amber-300 uppercase tracking-widest block">
-                  Imperial Palace Arcade 🎮
-                </span>
-                <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-emerald-900/80 text-emerald-300 border border-emerald-600/40">
-                  {syncStatus}
-                </span>
-              </div>
-              <h3 className="font-cinzel text-base sm:text-lg font-bold text-white">
-                Demigod Chif3n vs Apothecary Leslye
-              </h3>
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-emerald-400 hover:text-white hover:bg-emerald-900/60 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Presence & Role Switcher */}
-        <div className="p-2.5 rounded-xl bg-[#04120a] border border-emerald-900/80 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
-          {/* Identity */}
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
-            <span className="text-[11px] text-emerald-400 font-mono">You are:</span>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => handleSelectRole('chif3n')}
-                className={`px-2.5 py-1 rounded-lg border font-bold transition-all flex items-center gap-1 ${
-                  myRole === 'chif3n'
-                    ? 'bg-amber-400 text-black border-amber-300 shadow-md'
-                    : 'bg-[#030e08] text-amber-300/70 border-emerald-900 hover:text-white'
-                }`}
-              >
-                <Crown className="w-3.5 h-3.5" />
-                <span>Sir Chif3n 👑</span>
-              </button>
-              <button
-                onClick={() => handleSelectRole('leslye')}
-                className={`px-2.5 py-1 rounded-lg border font-bold transition-all flex items-center gap-1 ${
-                  myRole === 'leslye'
-                    ? 'bg-emerald-500 text-white border-emerald-400 shadow-md'
-                    : 'bg-[#030e08] text-emerald-300/70 border-emerald-900 hover:text-white'
-                }`}
-              >
-                <Leaf className="w-3.5 h-3.5" />
-                <span>Lady Leslye 🌿</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Mode Switcher: Single Device vs Dual Phone */}
-          <button
-            onClick={() => setPassAndPlay(!passAndPlay)}
-            className={`px-2.5 py-1 rounded-lg border font-mono text-[10px] transition-all flex items-center gap-1 ${
-              passAndPlay
-                ? 'bg-amber-400/20 text-amber-300 border-amber-400/60 font-bold'
-                : 'bg-emerald-950 text-emerald-300 border-emerald-700'
-            }`}
-            title="Toggle between playing on one phone vs 2 different phones"
-          >
-            {passAndPlay ? (
-              <>
-                <Smartphone className="w-3 h-3 text-amber-400" />
-                <span>📱 1-Phone (Take Turns)</span>
-              </>
-            ) : (
-              <>
-                <Globe className="w-3 h-3 text-emerald-400" />
-                <span>🌐 Dual-Phone Sync</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* 3 Games Navigation Pill Row */}
-        <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#030e08] border border-emerald-900/60 text-xs">
-          <button
-            onClick={() => handleSwitchTab('board')}
-            className={`py-2 px-2 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'board'
-                ? 'bg-gradient-to-r from-amber-500 to-yellow-600 text-black shadow-md'
-                : 'text-zinc-400 hover:text-emerald-200 hover:bg-emerald-950/40'
-            }`}
-          >
-            <Grid className="w-3.5 h-3.5" />
-            <span className="truncate">Board Duel ⚔️</span>
-          </button>
-
-          <button
-            onClick={() => handleSwitchTab('trivia')}
-            className={`py-2 px-2 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'trivia'
-                ? 'bg-gradient-to-r from-rose-500 to-pink-600 text-white shadow-md'
-                : 'text-zinc-400 hover:text-rose-200 hover:bg-emerald-950/40'
-            }`}
-          >
-            <Brain className="w-3.5 h-3.5" />
-            <span className="truncate">Anime Trivia 🧠</span>
-          </button>
-
-          <button
-            onClick={() => handleSwitchTab('alchemy')}
-            className={`py-2 px-2 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${
-              activeTab === 'alchemy'
-                ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md'
-                : 'text-zinc-400 hover:text-emerald-200 hover:bg-emerald-950/40'
-            }`}
-          >
-            <FlaskConical className="w-3.5 h-3.5" />
-            <span className="truncate">Herb Memory 🧪</span>
-          </button>
-        </div>
-
-        {/* ======================================================== */}
-        {/* GAME 1: IMPERIAL BOARD DUEL (TIC-TAC-TOE & GOMOKU)       */}
-        {/* ======================================================== */}
-        {activeTab === 'board' && (
-          <div className="space-y-3.5 animate-in fade-in">
-            {/* Mode & Scores */}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-1 bg-[#030e08] p-1 rounded-lg border border-emerald-900/60 text-xs">
-                <button
-                  onClick={() => handleToggleBoardMode('tictactoe')}
-                  className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all ${
-                    boardGame.mode === 'tictactoe'
-                      ? 'bg-emerald-600 text-white'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  3x3 Quick Duel
-                </button>
-                <button
-                  onClick={() => handleToggleBoardMode('gomoku')}
-                  className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all ${
-                    boardGame.mode === 'gomoku'
-                      ? 'bg-amber-500 text-black'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
-                >
-                  6x6 Grand Gomoku (4-in-a-row)
-                </button>
-              </div>
-
-              <button
-                onClick={handleResetBoard}
-                className="px-2.5 py-1 rounded-lg bg-[#04120a] hover:bg-emerald-900/40 text-emerald-300 border border-emerald-800 text-xs flex items-center gap-1"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Clear Grid</span>
-              </button>
-            </div>
-
-            {/* Scoreboard */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="p-2 rounded-xl bg-[#06180f] border border-amber-400/40">
-                <span className="text-[10px] text-amber-300 font-cinzel block">Sir Chif3n 👑</span>
-                <span className="text-xl font-bold font-mono text-white">{boardGame.scores.chif3n}</span>
-              </div>
-              <div className="p-2 rounded-xl bg-[#04100b] border border-emerald-900">
-                <span className="text-[10px] text-emerald-400 font-cinzel block">Ties 🤝</span>
-                <span className="text-xl font-bold font-mono text-zinc-300">{boardGame.scores.ties}</span>
-              </div>
-              <div className="p-2 rounded-xl bg-[#06180f] border border-emerald-500/40">
-                <span className="text-[10px] text-emerald-300 font-cinzel block">Lady Leslye 🌿</span>
-                <span className="text-xl font-bold font-mono text-white">{boardGame.scores.leslye}</span>
-              </div>
-            </div>
-
-            {/* Turn or Winner Announcement */}
-            {boardGame.winner ? (
-              <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-rose-500/20 border border-amber-400/50 animate-in zoom-in-95">
-                <span className="font-cinzel text-xs sm:text-sm font-bold text-amber-300 flex items-center justify-center gap-2">
-                  <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>
-                    {boardGame.winner === 'draw'
-                      ? 'Sacred Stalemate! Equal apothecary intellects.'
-                      : boardGame.winner === 'chif3n'
-                      ? 'Sir Chif3n Wins! Lady Leslye owes him a cozy cuddle.'
-                      : 'Lady Leslye Wins! Sir Chif3n must brew her fresh tea & snacks!'}
-                  </span>
+                <h2 className="font-cinzel text-sm sm:text-base font-bold text-white tracking-wide">
+                  Imperial Palace Arcade
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono bg-emerald-950 border border-emerald-500/60 text-emerald-300 flex items-center gap-1 shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <Cloud className="w-2.5 h-2.5 text-emerald-400" />
+                  <span>Firestore Live Sync</span>
                 </span>
               </div>
-            ) : (
-              <div className="p-2 rounded-xl bg-[#05170e] border border-emerald-800/80 text-xs font-mono flex items-center justify-center gap-2">
-                <span>Current Turn:</span>
-                <span className={`font-bold flex items-center gap-1 ${
-                  boardGame.currentTurn === 'chif3n' ? 'text-amber-300' : 'text-emerald-400'
-                }`}>
-                  {boardGame.currentTurn === 'chif3n' ? '👑 Sir Chif3n' : '🌿 Lady Leslye'}
-                  {passAndPlay ? '(Take Turn)' : isMyBoardTurn ? '· YOUR TURN!' : '· Waiting...'}
-                </span>
-              </div>
-            )}
-
-            {/* Board Grid */}
-            <div
-              className={`grid gap-2 mx-auto ${
-                boardGame.gridSize === 3 ? 'grid-cols-3 max-w-[280px]' : 'grid-cols-6 max-w-[340px]'
-              }`}
-            >
-              {boardGame.board.map((row, rIdx) =>
-                row.map((cell, cIdx) => (
-                  <button
-                    key={`${rIdx}-${cIdx}`}
-                    onClick={() => handleBoardCellClick(rIdx, cIdx)}
-                    disabled={cell !== null || boardGame.winner !== null || (!passAndPlay && !isMyBoardTurn)}
-                    className={`aspect-square rounded-xl border flex items-center justify-center transition-all ${
-                      cell === null
-                        ? 'bg-[#030e08]/90 border-emerald-800/70 hover:border-amber-400/80 hover:bg-[#061e12] active:scale-95'
-                        : cell === 'chif3n'
-                        ? 'bg-amber-400/20 border-amber-400 shadow-md shadow-amber-950/40'
-                        : 'bg-emerald-500/20 border-emerald-400 shadow-md shadow-emerald-950/40'
-                    }`}
-                  >
-                    {cell === 'chif3n' && (
-                      <span className="text-2xl sm:text-3xl animate-in zoom-in-75">👑</span>
-                    )}
-                    {cell === 'leslye' && (
-                      <span className="text-2xl sm:text-3xl animate-in zoom-in-75">🌿</span>
-                    )}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ======================================================== */}
-        {/* GAME 2: ANIME & APOTHECARY TRIVIA                        */}
-        {/* ======================================================== */}
-        {activeTab === 'trivia' && (
-          <div className="space-y-4 animate-in fade-in text-left">
-            {/* Header / Category & Score */}
-            <div className="flex items-center justify-between text-xs pb-1 border-b border-emerald-900/60">
-              <div className="flex items-center gap-1.5">
-                <Brain className="w-3.5 h-3.5 text-rose-400" />
-                <span className="font-cinzel text-amber-300 font-bold">
-                  {triviaGame.currentQuestion.category} · Question {triviaGame.questionIndex + 1}/{triviaGame.totalQuestions}
-                </span>
-              </div>
-              <div className="flex items-center gap-3 font-mono text-[11px]">
-                <span className="text-amber-300">Chif3n: {triviaGame.scores.chif3n}</span>
-                <span className="text-zinc-600">·</span>
-                <span className="text-emerald-400">Leslye: {triviaGame.scores.leslye}</span>
-              </div>
-            </div>
-
-            {/* Question Text */}
-            <div className="p-4 rounded-xl bg-[#04120a] border border-emerald-800 space-y-1">
-              <span className="text-[10px] uppercase font-mono text-emerald-500 font-bold block">
-                {triviaGame.currentQuestion.difficulty}
-              </span>
-              <p className="font-serif text-sm sm:text-base text-white leading-relaxed font-semibold">
-                "{triviaGame.currentQuestion.question}"
+              <p className="text-[10px] font-mono text-emerald-400/80">
+                Playing as: <span className="font-bold text-amber-300">{myRole === 'Chif3n' ? 'Sir Chif3n 👑' : 'Lady Leslye 🌿'}</span>
               </p>
             </div>
-
-            {/* Answer Options */}
-            <div className="grid grid-cols-1 gap-2">
-              {triviaGame.currentQuestion.options.map((opt, idx) => {
-                const isCorrect = idx === triviaGame.currentQuestion.correctIndex;
-                const isSelectedByChif3n = triviaGame.answers.chif3n === idx;
-                const isSelectedByLeslye = triviaGame.answers.leslye === idx;
-
-                let optStyle = 'bg-[#030e08] border-emerald-900/80 hover:border-emerald-600 text-emerald-100';
-                if (triviaGame.revealed) {
-                  if (isCorrect) {
-                    optStyle = 'bg-emerald-600/30 border-emerald-400 text-emerald-200 font-bold ring-1 ring-emerald-400';
-                  } else if (isSelectedByChif3n || isSelectedByLeslye) {
-                    optStyle = 'bg-rose-950/40 border-rose-600/60 text-rose-300 line-through opacity-70';
-                  }
-                }
-
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => handleAnswerTrivia(idx)}
-                    disabled={triviaGame.revealed}
-                    className={`w-full p-3 rounded-xl border text-left text-xs transition-all flex items-center justify-between gap-3 ${optStyle}`}
-                  >
-                    <div className="flex items-center gap-2.5 truncate">
-                      <span className="w-5 h-5 rounded-md bg-black/60 border border-emerald-900 flex items-center justify-center font-mono text-[10px] shrink-0">
-                        {String.fromCharCode(65 + idx)}
-                      </span>
-                      <span className="truncate">{opt}</span>
-                    </div>
-
-                    {/* Reveal badging */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      {isSelectedByChif3n && <span className="text-xs" title="Chif3n Chose This">👑</span>}
-                      {isSelectedByLeslye && <span className="text-xs" title="Leslye Chose This">🌿</span>}
-                      {triviaGame.revealed && isCorrect && (
-                        <Check className="w-4 h-4 text-emerald-400 ml-1" />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Reveal Fun Fact & Next Question Button */}
-            {triviaGame.revealed && (
-              <div className="p-3.5 rounded-xl bg-[#061e12] border border-amber-400/50 space-y-2 animate-in zoom-in-95">
-                <div className="flex items-center gap-2 text-amber-300 font-cinzel text-xs font-bold">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span>
-                    {triviaGame.roundWinner === 'tie'
-                      ? 'Both Got It Right! +10 Points to Both ❤️'
-                      : triviaGame.roundWinner === 'chif3n'
-                      ? 'Sir Chif3n Scored! +10 Points 👑'
-                      : triviaGame.roundWinner === 'leslye'
-                      ? 'Lady Leslye Scored! +10 Points 🌿'
-                      : 'Neither got it! The palace mystery remains deep.'}
-                  </span>
-                </div>
-                <p className="text-xs text-emerald-100 font-serif italic">
-                  💡 {triviaGame.currentQuestion.funFact}
-                </p>
-                <div className="pt-2 text-right">
-                  <button
-                    onClick={handleNextTrivia}
-                    className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 text-black font-bold text-xs shadow-md"
-                  >
-                    Next Question →
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
-        )}
 
-        {/* ======================================================== */}
-        {/* GAME 3: ALCHEMY HERB MEMORY MATCH-2                      */}
-        {/* ======================================================== */}
-        {activeTab === 'alchemy' && (
-          <div className="space-y-3.5 animate-in fade-in">
-            {/* Header & Scores */}
-            <div className="flex items-center justify-between text-xs pb-1 border-b border-emerald-900/60">
-              <span className="font-cinzel text-amber-300 font-bold">
-                12-Herb Match-2 Sanctuary Duel
+          <div className="flex items-center gap-2">
+            {/* Pass and Play Toggle */}
+            <button
+              onClick={() => setPassAndPlay(!passAndPlay)}
+              className={`px-2.5 py-1 rounded-xl text-xs font-mono border transition-all ${
+                passAndPlay
+                  ? 'bg-amber-500/20 border-amber-400 text-amber-300'
+                  : 'bg-[#04140e] border-emerald-900 text-emerald-400'
+              }`}
+              title="Toggle Same-Device Pass & Play"
+            >
+              {passAndPlay ? '📱 Single Screen' : '🌐 Multi-Device Sync'}
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl text-emerald-400 hover:text-white hover:bg-emerald-950 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+
+        {/* Game Mode Selector Tabs */}
+        <nav className="px-4 py-2 bg-[#020b06] border-b border-emerald-950 flex items-center gap-1.5 overflow-x-auto scrollbar-none shrink-0">
+          {[
+            { id: 'tic-tac-toe', name: 'Tic-Tac-Toe', icon: Grid },
+            { id: 'gomoku', name: 'Gomoku (8x8)', icon: Layers },
+            { id: 'couples-telepathy', name: 'Couples Telepathy', icon: Heart },
+            { id: 'potion-craft', name: 'Potion Craft Co-op', icon: FlaskConical },
+            { id: 'trivia', name: 'Anime Trivia Duel', icon: Brain },
+            { id: 'silhouette-duel', name: 'Silhouette Duel', icon: Eye }
+          ].map((g) => {
+            const Icon = g.icon;
+            const isSelected = session.gameId === g.id;
+            return (
+              <button
+                key={g.id}
+                onClick={() => switchGame(g.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-cinzel font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-600 text-black shadow-md ring-1 ring-amber-300'
+                    : 'bg-[#04160e] text-emerald-300 border border-emerald-900/80 hover:border-emerald-600'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{g.name}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Turn & Score Banner */}
+        <div className="px-5 py-2.5 bg-[#03130c] border-b border-emerald-900/60 flex items-center justify-between text-xs shrink-0">
+          {/* Turn Indicator */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-emerald-500 uppercase tracking-wider">Turn:</span>
+            <div
+              className={`px-3 py-1 rounded-xl font-bold flex items-center gap-1.5 shadow-sm ${
+                session.turn === 'Chif3n'
+                  ? 'bg-amber-400/20 text-amber-300 border border-amber-400/50'
+                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/50'
+              }`}
+            >
+              {session.turn === 'Chif3n' ? <Crown className="w-3.5 h-3.5 text-amber-400" /> : <Leaf className="w-3.5 h-3.5 text-emerald-400" />}
+              <span>{session.turn === 'Chif3n' ? 'Sir Chif3n 👑' : 'Lady Leslye 🌿'}</span>
+              {isMyTurn && <span className="text-[9px] bg-emerald-900 px-1.5 py-0.2 rounded-full text-emerald-200">Your Move!</span>}
+            </div>
+          </div>
+
+          {/* Scores */}
+          <div className="flex items-center gap-3 font-mono text-xs">
+            <span className="text-amber-400 font-bold">Chif3n: {session.scores.Chif3n}</span>
+            <span className="text-zinc-600">|</span>
+            <span className="text-emerald-400 font-bold">Leslye: {session.scores.Leslye}</span>
+          </div>
+        </div>
+
+        {/* Active Game Canvas */}
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto flex flex-col items-center justify-center bg-gradient-to-b from-[#020a06] via-[#03120b] to-[#010704]">
+          {/* Winner Celebration Banner */}
+          {session.winner && (
+            <div className="mb-4 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-amber-500/20 border border-amber-400/60 text-center animate-in zoom-in-95 duration-200">
+              <span className="font-cinzel text-sm sm:text-base font-bold text-amber-200 flex items-center justify-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-400" />
+                <span>{session.winner}</span>
+                <Sparkles className="w-4 h-4 text-amber-400" />
               </span>
-              <div className="flex items-center gap-3 font-mono text-[11px]">
-                <span className="text-amber-300">Chif3n: {alchemyGame.scores.chif3n}</span>
-                <span className="text-zinc-600">·</span>
-                <span className="text-emerald-400">Leslye: {alchemyGame.scores.leslye}</span>
-              </div>
             </div>
+          )}
 
-            {/* Winner or Current Turn */}
-            {alchemyGame.winner ? (
-              <div className="p-3 rounded-xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-rose-500/20 border border-amber-400/50 animate-in zoom-in-95">
-                <span className="font-cinzel text-xs sm:text-sm font-bold text-amber-300 flex items-center justify-center gap-2">
-                  <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>
-                    {alchemyGame.winner === 'draw'
-                      ? 'Tie! Both are master herbalists.'
-                      : alchemyGame.winner === 'chif3n'
-                      ? 'Sir Chif3n Mastered the Herbs! 👑'
-                      : 'Lady Leslye Reigns Supreme! 🌿'}
+          {/* GAME 1 & 2: TIC-TAC-TOE / GOMOKU */}
+          {(session.gameId === 'tic-tac-toe' || session.gameId === 'gomoku') && (
+            <div className="flex flex-col items-center space-y-4">
+              <div
+                className={`grid gap-1.5 sm:gap-2 p-3 bg-[#03150d] rounded-2xl border border-emerald-900/80 shadow-2xl ${
+                  session.gameId === 'gomoku' ? 'grid-cols-8' : 'grid-cols-3'
+                }`}
+              >
+                {session.boardState.grid.map((row: any[], r: number) =>
+                  row.map((cell, c) => (
+                    <button
+                      key={`${r}-${c}`}
+                      onClick={() => handleBoardClick(r, c)}
+                      disabled={!isMyTurn || session.winner !== null || cell !== null}
+                      className={`rounded-xl flex items-center justify-center font-bold transition-all ${
+                        session.gameId === 'gomoku'
+                          ? 'w-8 h-8 sm:w-10 sm:h-10 text-sm sm:text-base'
+                          : 'w-20 h-20 sm:w-24 sm:h-24 text-2xl sm:text-3xl'
+                      } ${
+                        cell
+                          ? 'bg-[#042013] border border-emerald-500/50 shadow-inner'
+                          : 'bg-[#020f08] border border-emerald-950 hover:border-emerald-600 hover:bg-[#052818]'
+                      }`}
+                    >
+                      {cell}
+                    </button>
+                  ))
+                )}
+              </div>
+
+              <button
+                onClick={resetBoard}
+                className="px-4 py-2 rounded-xl bg-[#04160e] hover:bg-[#072517] border border-emerald-700 text-emerald-300 text-xs font-cinzel font-bold flex items-center gap-2 transition-all"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Reset Grid</span>
+              </button>
+            </div>
+          )}
+
+          {/* GAME 3: COUPLES' TELEPATHY */}
+          {session.gameId === 'couples-telepathy' && (
+            <div className="w-full max-w-lg space-y-5 text-center">
+              <div className="p-4 rounded-2xl bg-[#03150d] border border-emerald-800/80 shadow-lg">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400 block mb-1">
+                  Synchronicity Prompt #{session.boardState.telepathyPromptIdx + 1}
+                </span>
+                <h3 className="font-cinzel text-base sm:text-lg font-bold text-white">
+                  "{currentTelepathy.prompt}"
+                </h3>
+              </div>
+
+              {/* Status of Both Players */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-2xl bg-[#021009] border border-amber-500/40 flex items-center justify-center gap-2">
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-200">
+                    Chif3n: {session.boardState.telepathyChoices?.Chif3n !== null ? 'Locked In! 🔒' : 'Thinking... 💭'}
                   </span>
-                </span>
-                <button
-                  onClick={handleResetAlchemy}
-                  className="mt-2 px-3 py-1 rounded-lg bg-amber-400 text-black font-bold text-xs"
-                >
-                  Play Again
-                </button>
+                </div>
+                <div className="p-3 rounded-2xl bg-[#021009] border border-emerald-500/40 flex items-center justify-center gap-2">
+                  <Leaf className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-bold text-emerald-200">
+                    Leslye: {session.boardState.telepathyChoices?.Leslye !== null ? 'Locked In! 🔒' : 'Thinking... 💭'}
+                  </span>
+                </div>
               </div>
-            ) : (
-              <div className="flex items-center justify-between p-2 rounded-xl bg-[#05170e] border border-emerald-800 text-xs font-mono">
-                <span>Turn:</span>
-                <span className={`font-bold flex items-center gap-1 ${
-                  alchemyGame.currentTurn === 'chif3n' ? 'text-amber-300' : 'text-emerald-400'
-                }`}>
-                  {alchemyGame.currentTurn === 'chif3n' ? '👑 Sir Chif3n' : '🌿 Lady Leslye'}
-                  {passAndPlay ? '(Tap 2 Cards)' : isMyAlchemyTurn ? '· YOUR TURN!' : '· Waiting...'}
-                </span>
-                <button
-                  onClick={handleResetAlchemy}
-                  className="text-zinc-400 hover:text-white text-[10px]"
-                >
-                  Reshuffle
-                </button>
+
+              {/* Options */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {currentTelepathy.options.map((opt, idx) => {
+                  const isMySelection = session.boardState.telepathyChoices?.[myRole] === idx;
+                  const isRevealed = session.boardState.telepathyRevealed;
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleTelepathyChoice(idx)}
+                      disabled={isRevealed}
+                      className={`p-4 rounded-2xl text-xs sm:text-sm font-serif font-bold text-left transition-all ${
+                        isMySelection
+                          ? 'bg-gradient-to-r from-amber-500 to-yellow-600 text-black shadow-lg ring-2 ring-amber-300'
+                          : 'bg-[#03170e] hover:bg-[#052618] border border-emerald-900 text-emerald-200 hover:text-white'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
               </div>
-            )}
 
-            {/* 12 Cards Grid (3x4) */}
-            <div className="grid grid-cols-4 gap-2 max-w-sm mx-auto">
-              {alchemyGame.cards.map((card, idx) => {
-                const isFlipped = alchemyGame.flippedIndices.includes(idx) || card.isMatched;
-
-                return (
-                  <button
-                    key={card.id}
-                    onClick={() => handleAlchemyFlip(idx)}
-                    disabled={isFlipped || (!passAndPlay && !isMyAlchemyTurn) || alchemyGame.winner !== null}
-                    className={`aspect-square rounded-xl border p-1 flex flex-col items-center justify-center transition-all ${
-                      card.isMatched
-                        ? 'bg-emerald-950/70 border-emerald-500/80 text-emerald-200'
-                        : isFlipped
-                        ? 'bg-amber-400/20 border-amber-400 text-white animate-in zoom-in-75'
-                        : 'bg-[#03110a] border-emerald-900/80 hover:border-emerald-600 hover:bg-[#051e12] active:scale-95'
-                    }`}
-                  >
-                    {isFlipped ? (
-                      <>
-                        <span className="text-2xl">{card.symbol}</span>
-                        <span className="text-[8px] font-mono truncate max-w-full text-emerald-300 mt-0.5">
-                          {card.herbName.split(' ')[0]}
-                        </span>
-                      </>
-                    ) : (
-                      <div className="w-full h-full rounded-lg border border-dashed border-emerald-800/60 flex items-center justify-center text-emerald-700 font-serif text-sm">
-                        🌿
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
+              {session.boardState.telepathyRevealed && (
+                <button
+                  onClick={nextTelepathyPrompt}
+                  className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-black font-cinzel font-bold text-xs shadow-lg active:scale-95 transition-all"
+                >
+                  Next Telepathy Card →
+                </button>
+              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Footer info */}
-        <div className="pt-2 text-[10px] text-emerald-500/80 font-mono border-t border-emerald-950 flex items-center justify-between">
-          <span>Active Role: <strong className="text-white">{myRole === 'leslye' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑'}</strong></span>
-          <button
-            onClick={onOpenLoginModal}
-            className="text-amber-300 underline font-semibold hover:text-white"
-          >
-            Switch Profile
-          </button>
+          {/* GAME 4: POTION CRAFT (ALCHEMY CO-OP) */}
+          {session.gameId === 'potion-craft' && (
+            <div className="w-full max-w-lg space-y-5 text-center">
+              <div className="p-4 rounded-2xl bg-[#03150d] border border-emerald-800/80 shadow-lg">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 block mb-1">
+                  Imperial Cauldron of Synergy
+                </span>
+                <p className="text-xs font-serif text-emerald-300">
+                  Take turns dropping 2 mystical ingredients into the cauldron to synthesize a demigod remedy!
+                </p>
+              </div>
+
+              {/* The Cauldron Display */}
+              <div className="w-48 h-48 mx-auto rounded-full bg-gradient-to-b from-[#0a281a] via-[#051c11] to-[#020d07] border-4 border-amber-400/60 shadow-2xl flex flex-col items-center justify-center p-4 relative overflow-hidden">
+                <div className="text-4xl animate-bounce mb-1">
+                  {session.boardState.potionSlots?.length === 2 ? '✨' : '🍵'}
+                </div>
+                <div className="flex gap-2">
+                  {session.boardState.potionSlots?.map((slotId: string, i: number) => {
+                    const ing = ALCHEMY_INGREDIENTS.find((a) => a.id === slotId);
+                    return (
+                      <span key={i} className="text-2xl" title={ing?.name}>
+                        {ing?.icon}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Crafted Potion Reveal */}
+              {session.boardState.craftedPotion && (
+                <div
+                  className={`p-4 rounded-2xl bg-gradient-to-r ${session.boardState.craftedPotion.color} text-black font-cinzel shadow-xl animate-in zoom-in-95`}
+                >
+                  <h4 className="font-bold text-base">{session.boardState.craftedPotion.name}</h4>
+                  <p className="text-xs font-serif mt-1 font-semibold">
+                    {session.boardState.craftedPotion.effect}
+                  </p>
+                </div>
+              )}
+
+              {/* Ingredient Picker Grid */}
+              <div className="grid grid-cols-3 gap-2">
+                {ALCHEMY_INGREDIENTS.map((ing) => (
+                  <button
+                    key={ing.id}
+                    onClick={() => handleAddIngredient(ing.id)}
+                    disabled={!isMyTurn || session.boardState.potionSlots?.length >= 2}
+                    className="p-3 rounded-2xl bg-[#03180e] hover:bg-[#062c1b] border border-emerald-900/80 hover:border-emerald-500 text-left transition-all active:scale-95 disabled:opacity-40"
+                  >
+                    <div className="text-2xl mb-1">{ing.icon}</div>
+                    <div className="font-cinzel text-xs font-bold text-white truncate">{ing.name}</div>
+                    <div className="text-[9px] font-mono text-emerald-400">{ing.element}</div>
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={resetCauldron}
+                className="px-4 py-2 rounded-xl bg-[#04160e] hover:bg-[#072517] border border-emerald-700 text-emerald-300 text-xs font-cinzel font-bold flex items-center gap-2 mx-auto transition-all"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Clear Cauldron</span>
+              </button>
+            </div>
+          )}
+
+          {/* GAME 5: ANIME TRIVIA DUEL */}
+          {session.gameId === 'trivia' && (
+            <div className="w-full max-w-lg space-y-5 text-center">
+              <div className="p-4 rounded-2xl bg-[#03150d] border border-emerald-800/80 shadow-lg">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400 block mb-1">
+                  Imperial Quiz Question #{session.boardState.triviaQuestionIdx + 1}
+                </span>
+                <h3 className="font-cinzel text-base sm:text-lg font-bold text-white">
+                  "{TRIVIA_QUESTIONS[session.boardState.triviaQuestionIdx || 0].question}"
+                </h3>
+              </div>
+
+              {/* Status of Both Players */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-2xl bg-[#021009] border border-amber-500/40 flex items-center justify-center gap-2">
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-200">
+                    Chif3n: {session.boardState.triviaAnswers?.Chif3n !== null ? 'Answer Locked! 🔒' : 'Pondering... 💭'}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-[#021009] border border-emerald-500/40 flex items-center justify-center gap-2">
+                  <Leaf className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-bold text-emerald-200">
+                    Leslye: {session.boardState.triviaAnswers?.Leslye !== null ? 'Answer Locked! 🔒' : 'Pondering... 💭'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Options */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {TRIVIA_QUESTIONS[session.boardState.triviaQuestionIdx || 0].options.map((opt, idx) => {
+                  const isMySelection = session.boardState.triviaAnswers?.[myRole] === idx;
+                  const isRevealed = session.boardState.triviaRevealed;
+                  const isCorrect = idx === TRIVIA_QUESTIONS[session.boardState.triviaQuestionIdx || 0].correct;
+
+                  let btnStyle = 'bg-[#03170e] hover:bg-[#052618] border border-emerald-900 text-emerald-200 hover:text-white';
+                  if (isRevealed) {
+                    if (isCorrect) {
+                      btnStyle = 'bg-emerald-600 text-white border-emerald-400 font-bold shadow-lg';
+                    } else if (isMySelection) {
+                      btnStyle = 'bg-rose-900/60 text-rose-200 border-rose-500';
+                    }
+                  } else if (isMySelection) {
+                    btnStyle = 'bg-gradient-to-r from-amber-500 to-yellow-600 text-black shadow-lg ring-2 ring-amber-300';
+                  }
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleTriviaAnswer(idx)}
+                      disabled={isRevealed}
+                      className={`p-4 rounded-2xl text-xs sm:text-sm font-serif font-bold text-left transition-all ${btnStyle}`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {session.boardState.triviaRevealed && (
+                <div className="space-y-3">
+                  <p className="text-xs font-serif text-amber-200 bg-amber-950/40 p-3 rounded-xl border border-amber-600/40">
+                    📜 {TRIVIA_QUESTIONS[session.boardState.triviaQuestionIdx || 0].funFact}
+                  </p>
+                  <button
+                    onClick={nextTriviaQuestion}
+                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-black font-cinzel font-bold text-xs shadow-lg active:scale-95 transition-all"
+                  >
+                    Next Trivia Scroll →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* GAME 6: SILHOUETTE MYSTERY DUEL */}
+          {session.gameId === 'silhouette-duel' && (
+            <div className="w-full max-w-lg space-y-4 text-center">
+              <div className="p-4 rounded-2xl bg-[#03150d] border border-emerald-800/80 shadow-lg">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400 block mb-1">
+                  Anime Silhouette Mystery
+                </span>
+                <p className="text-xs font-serif text-emerald-300">
+                  Uncover clues together or guess the character to claim victory!
+                </p>
+              </div>
+
+              {/* Obscured Portrait */}
+              <div className="w-36 h-36 mx-auto rounded-3xl bg-[#020f08] border-2 border-emerald-500/60 flex items-center justify-center shadow-xl overflow-hidden relative">
+                <div
+                  className={`text-6xl transition-all duration-500 ${
+                    session.boardState.silhouetteSolved ? 'filter-none scale-100' : 'filter brightness-0 contrast-200 blur-sm scale-110'
+                  }`}
+                >
+                  🎭
+                </div>
+              </div>
+
+              {/* Clues */}
+              <div className="space-y-2 text-left">
+                {currentSilhouette.hints.map((hint, idx) => {
+                  const isRevealed = idx < (session.boardState.revealedHintCount || 1);
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-xl border text-xs font-serif transition-all ${
+                        isRevealed
+                          ? 'bg-[#042013] border-emerald-600 text-emerald-100'
+                          : 'bg-[#020c06] border-emerald-950 text-zinc-600'
+                      }`}
+                    >
+                      <span className="font-mono text-emerald-400 font-bold mr-2">Clue #{idx + 1}:</span>
+                      {isRevealed ? hint : 'Locked behind the imperial veil...'}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-center gap-3 pt-2">
+                {!session.boardState.silhouetteSolved && (
+                  <>
+                    <button
+                      onClick={handleRevealNextHint}
+                      disabled={session.boardState.revealedHintCount >= 4}
+                      className="px-4 py-2 rounded-xl bg-[#04160e] hover:bg-[#072517] border border-emerald-700 text-emerald-300 text-xs font-cinzel font-bold disabled:opacity-40"
+                    >
+                      Unlock Next Clue
+                    </button>
+                    <button
+                      onClick={handleSolveSilhouette}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-black text-xs font-cinzel font-bold shadow-md"
+                    >
+                      I Know Who It Is!
+                    </button>
+                  </>
+                )}
+
+                {session.boardState.silhouetteSolved && (
+                  <button
+                    onClick={nextSilhouette}
+                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-black font-cinzel font-bold text-xs shadow-lg"
+                  >
+                    Next Mystery Target →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

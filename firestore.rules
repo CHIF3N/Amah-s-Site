@@ -6,16 +6,11 @@ service cloud.firestore {
       return data.id is string
         && data.sender is string
         && data.sender.size() > 0
-        && data.senderRole in ['chif3n', 'leslye', 'demigod']
-        && data.text is string
-        && data.text.size() > 0
-        && data.text.size() <= 2000
         && data.timestamp is number;
     }
 
     function isValidArcadeState(data) {
-      return data.activeGame in ['board', 'trivia', 'alchemy']
-        && data.lastUpdated is number;
+      return (('activeGame' in data && data.activeGame is string) || ('gameId' in data && data.gameId is string));
     }
 
     match /loveScrolls/{scrollId} {

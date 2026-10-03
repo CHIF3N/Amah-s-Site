@@ -37,13 +37,18 @@ export interface FirebaseLoveScroll {
   id: string;
   sender: string;
   senderRole: 'chif3n' | 'leslye' | 'demigod';
-  text: string;
+  type?: 'text' | 'audio' | 'image';
+  text?: string;
+  audioUrl?: string;
+  duration?: number;
+  imageUrl?: string;
+  caption?: string;
   timestamp: number;
 }
 
 /**
  * Real-time subscription to the couple's live love scrolls.
- * Updates instantaneously on any connected phone or laptop anywhere in the world.
+ * Supports text decrees, browser voice notes, and compressed photos.
  */
 export function subscribeToLoveScrolls(onUpdate: (messages: FirebaseLoveScroll[]) => void): () => void {
   try {
@@ -54,12 +59,17 @@ export function subscribeToLoveScrolls(onUpdate: (messages: FirebaseLoveScroll[]
         const msgs: FirebaseLoveScroll[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data() as FirebaseLoveScroll;
-          if (data && data.text) {
+          if (data && (data.text || data.audioUrl || data.imageUrl)) {
             msgs.push({
               id: data.id || docSnap.id,
               sender: data.sender || 'Sanctuary Keeper 🌿',
               senderRole: data.senderRole || 'demigod',
-              text: data.text,
+              type: data.type || (data.audioUrl ? 'audio' : data.imageUrl ? 'image' : 'text'),
+              text: data.text || '',
+              audioUrl: data.audioUrl,
+              duration: data.duration,
+              imageUrl: data.imageUrl,
+              caption: data.caption,
               timestamp: data.timestamp || Date.now()
             });
           }
@@ -78,19 +88,25 @@ export function subscribeToLoveScrolls(onUpdate: (messages: FirebaseLoveScroll[]
 }
 
 /**
- * Save a new love scroll to Cloud Firestore.
- * Transmits across the world in <100ms.
+ * Save a new love scroll or multimedia note to Cloud Firestore.
  */
 export async function pushLoveScrollToCloud(scroll: FirebaseLoveScroll): Promise<boolean> {
   try {
     const docRef = doc(db, 'loveScrolls', scroll.id);
-    await setDoc(docRef, {
+    const payload: Record<string, any> = {
       id: scroll.id,
       sender: scroll.sender,
       senderRole: scroll.senderRole,
-      text: scroll.text,
+      type: scroll.type || 'text',
       timestamp: scroll.timestamp
-    });
+    };
+    if (scroll.text !== undefined) payload.text = scroll.text;
+    if (scroll.audioUrl) payload.audioUrl = scroll.audioUrl;
+    if (scroll.duration) payload.duration = scroll.duration;
+    if (scroll.imageUrl) payload.imageUrl = scroll.imageUrl;
+    if (scroll.caption) payload.caption = scroll.caption;
+
+    await setDoc(docRef, payload);
     return true;
   } catch (err) {
     console.error('[Firestore] Failed to save love scroll:', err);
@@ -139,6 +155,59 @@ export async function syncArcadeToCloud(arcadeState: any): Promise<boolean> {
     return true;
   } catch (err) {
     console.error('[Firestore] Failed to sync arcade state:', err);
+    return false;
+  }
+}
+
+export interface ArcadeCloudState {
+  gameId: string; // 'tic-tac-toe' | 'gomoku' | 'trivia' | 'alchemy' | 'couples-telepathy' | 'potion-craft' | 'silhouette-duel';
+  turn: 'Chif3n' | 'Leslye';
+  boardState: any;
+  scores: { Chif3n: number; Leslye: number };
+  lastMove: { player: string; action: string; timestamp: number };
+  winner: string | null;
+}
+
+/**
+ * Real-time listener for the activeSession document in Firestore
+ */
+export function subscribeToActiveArcadeSession(onUpdate: (state: ArcadeCloudState) => void): () => void {
+  try {
+    const docRef = doc(db, 'coupleArcade', 'activeSession');
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as ArcadeCloudState;
+          if (data && data.gameId) {
+            onUpdate(data);
+          }
+        }
+      },
+      (error) => {
+        console.warn('[Firestore] activeSession subscription warning:', error);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('[Firestore] Error initializing activeSession listener:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Update the shared activeSession document in Firestore
+ */
+export async function updateActiveArcadeSession(state: Partial<ArcadeCloudState>): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'coupleArcade', 'activeSession');
+    await setDoc(docRef, {
+      ...state,
+      lastUpdated: Date.now()
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[Firestore] Failed to update activeSession:', err);
     return false;
   }
 }

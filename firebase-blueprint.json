@@ -2,7 +2,7 @@
   "entities": {
     "LoveScroll": {
       "title": "LoveScroll",
-      "description": "A live romantic message or decree sent between Sir Chif3n and Lady Leslye",
+      "description": "A live romantic message, voice note, or photo decree sent between Sir Chif3n and Lady Leslye",
       "type": "object",
       "properties": {
         "id": {
@@ -18,59 +18,80 @@
           "enum": ["chif3n", "leslye", "demigod"],
           "description": "Imperial role of the author"
         },
+        "type": {
+          "type": "string",
+          "enum": ["text", "audio", "image"],
+          "description": "Payload kind: text message, voice note, or compressed photo"
+        },
         "text": {
           "type": "string",
-          "maxLength": 2000,
-          "description": "Text body of the scroll"
+          "description": "Text body or decree message"
+        },
+        "audioUrl": {
+          "type": "string",
+          "description": "Data URL or storage link for the voice note"
+        },
+        "duration": {
+          "type": "number",
+          "description": "Duration of voice recording in seconds"
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Data URL or storage link for the shared image"
+        },
+        "caption": {
+          "type": "string",
+          "description": "Optional image caption"
         },
         "timestamp": {
           "type": "number",
           "description": "Unix timestamp in milliseconds"
         }
       },
-      "required": ["id", "sender", "senderRole", "text", "timestamp"]
+      "required": ["id", "sender", "timestamp"]
     },
-    "ArcadeState": {
-      "title": "ArcadeState",
-      "description": "Shared real-time game and presence state for Imperial Couple Arcade",
+    "ArcadeCloudState": {
+      "title": "ArcadeCloudState",
+      "description": "Shared real-time 2-player arcade session synchronized via Cloud Firestore",
       "type": "object",
       "properties": {
-        "activeGame": {
+        "gameId": {
           "type": "string",
-          "enum": ["board", "trivia", "alchemy"],
-          "description": "Currently active arcade game"
+          "enum": ["tic-tac-toe", "gomoku", "trivia", "telepathy", "alchemy"],
+          "description": "Active game identifier"
         },
-        "boardGame": {
+        "turn": {
+          "type": "string",
+          "enum": ["Chif3n", "Leslye"],
+          "description": "Active player turn"
+        },
+        "boardState": {
           "type": "object",
-          "description": "Board game state (TicTacToe and Gomoku)"
+          "description": "Active board, cards, telepathy, or potion grid data"
         },
-        "triviaGame": {
+        "scores": {
           "type": "object",
-          "description": "Trivia game state"
+          "description": "Current match score tally between Chif3n and Leslye"
         },
-        "alchemyGame": {
+        "lastMove": {
           "type": "object",
-          "description": "Alchemy card matching game state"
+          "description": "Metadata regarding the latest player action"
         },
-        "presence": {
-          "type": "object",
-          "description": "Presence indicators for Sir Chif3n and Lady Leslye"
-        },
-        "lastUpdated": {
-          "type": "number",
-          "description": "Unix timestamp in milliseconds of last move"
+        "winner": {
+          "type": "string",
+          "description": "Winner name or null"
         }
       },
-      "required": ["activeGame", "lastUpdated"]
+      "required": ["gameId", "turn"]
     }
   },
   "firestore": {
     "/loveScrolls/{scrollId}": {
       "schema": "LoveScroll",
-      "description": "Collection of all live love scrolls and real-time chat messages between Sir Chif3n and Lady Leslye"
+      "description": "Collection of all live multimedia love scrolls (text, audio notes, and photos) between Sir Chif3n and Lady Leslye"
     },
     "/coupleArcade/{docId}": {
-      "schema": "ArcadeState",
+      "schema": "ArcadeCloudState",
       "description": "Shared real-time state document for the 2-player imperial games across devices"
     }
   }

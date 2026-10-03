@@ -39,6 +39,7 @@ import { AnimeGachaAltar } from './components/AnimeGachaAltar';
 import { BroadcastSchedule } from './components/BroadcastSchedule';
 import { LoFiRadio } from './components/LoFiRadio';
 import { LiveLoveScrollChatbox } from './components/LiveLoveScrollChatbox';
+import { ImperialChatVault } from './components/ImperialChatVault';
 import { ImperialCoupleGame } from './components/ImperialCoupleGame';
 import { ImperialLoginModal, ImperialRole } from './components/ImperialLoginModal';
 import { WatchActivityChart } from './components/WatchActivityChart';
@@ -67,6 +68,7 @@ export default function App() {
   const [gachaModalOpen, setGachaModalOpen] = useState(false);
   const [radioModalOpen, setRadioModalOpen] = useState(false);
   const [floatingChatOpen, setFloatingChatOpen] = useState(false);
+  const [vaultOpen, setVaultOpen] = useState(false);
   const [gameModalOpen, setGameModalOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [activeRole, setActiveRole] = useState<ImperialRole>(() => {
@@ -450,6 +452,10 @@ export default function App() {
       <Navbar
         activeTab={activeTab}
         onSelectTab={(tab) => {
+          if (tab === 'love-scrolls') {
+            setVaultOpen(true);
+            return;
+          }
           setActiveTab(tab);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
@@ -458,6 +464,7 @@ export default function App() {
         onOpenRadio={() => setRadioModalOpen(true)}
         onOpenPoetry={() => setPoetryDrawerOpen(true)}
         onOpenGame={() => setGameModalOpen(true)}
+        onOpenChatVault={() => setVaultOpen(true)}
         onOpenLogin={() => setLoginModalOpen(true)}
         activeRole={activeRole}
         ambientMode={ambientMode}
@@ -539,6 +546,14 @@ export default function App() {
           >
             <Dice5 className="w-3.5 h-3.5 text-amber-400" />
             <span>🎲 Anime Gacha Altar</span>
+          </button>
+
+          <button
+            onClick={() => setVaultOpen(true)}
+            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-950/80 via-pink-950/60 to-amber-950/70 border border-rose-500/50 hover:border-rose-400 text-rose-200 hover:text-white text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start shadow-sm active:scale-95"
+          >
+            <Heart className="w-3.5 h-3.5 fill-rose-400 text-rose-400 animate-pulse" />
+            <span>💌 Secret Vault (Private Chat)</span>
           </button>
 
           <button
@@ -868,23 +883,22 @@ export default function App() {
         />
       )}
 
-      {/* Floating Real-time Love Scrolls Chatbox */}
-      <LiveLoveScrollChatbox
-        isFloating={true}
-        isOpen={floatingChatOpen}
-        onClose={() => setFloatingChatOpen(false)}
+      {/* Passcode-Protected Full-Screen Imperial Secret Vault */}
+      <ImperialChatVault
+        isOpen={vaultOpen}
+        onClose={() => setVaultOpen(false)}
         onOpenLoginModal={() => setLoginModalOpen(true)}
       />
 
-      {/* Floating Chatbox Launcher Button (Bottom Right) */}
-      {!floatingChatOpen && (
+      {/* Floating Imperial Secret Vault Launcher Button (Bottom Right) */}
+      {!vaultOpen && (
         <button
-          onClick={() => setFloatingChatOpen(true)}
-          className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-40 px-3.5 py-2.5 rounded-full bg-gradient-to-r from-rose-600 via-pink-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold text-xs shadow-xl shadow-rose-950/60 border border-rose-400/50 flex items-center gap-2 transition-all active:scale-95 animate-in fade-in"
-          title="Open Real-time Love Scrolls & Live Chat"
+          onClick={() => setVaultOpen(true)}
+          className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-40 px-4 py-2.5 rounded-full bg-gradient-to-r from-rose-600 via-pink-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-bold text-xs shadow-xl shadow-rose-950/60 border border-rose-400/50 flex items-center gap-2 transition-all active:scale-95 animate-in fade-in"
+          title="Open The Imperial Secret Vault"
         >
           <Heart className="w-4 h-4 fill-white animate-pulse" />
-          <span className="hidden sm:inline font-cinzel">Live Love Scrolls</span>
+          <span className="font-cinzel">Secret Vault 💌</span>
           <span className="w-2 h-2 rounded-full bg-emerald-300 ring-2 ring-emerald-500" />
         </button>
       )}

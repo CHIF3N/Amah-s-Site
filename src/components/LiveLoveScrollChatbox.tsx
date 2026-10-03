@@ -24,7 +24,12 @@ export interface LiveLoveMessage {
   id: string;
   sender: string;
   senderRole: 'chif3n' | 'leslye' | 'demigod';
-  text: string;
+  type?: 'text' | 'audio' | 'image';
+  text?: string;
+  audioUrl?: string;
+  duration?: number;
+  imageUrl?: string;
+  caption?: string;
   timestamp: number;
 }
 

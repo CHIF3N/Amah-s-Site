@@ -23,6 +23,7 @@ interface NavbarProps {
   onOpenPoetry: () => void;
   onOpenGame?: () => void;
   onOpenLogin?: () => void;
+  onOpenChatVault?: () => void;
   activeRole?: 'chif3n' | 'leslye';
   ambientMode: 'stars' | 'sakura' | 'off';
   onToggleAmbient: () => void;
@@ -38,6 +39,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenPoetry,
   onOpenGame,
   onOpenLogin,
+  onOpenChatVault,
   activeRole = 'chif3n',
   ambientMode,
   onToggleAmbient,
@@ -157,6 +159,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Vows & Poetry</span>
           </button>
 
+          {/* Imperial Secret Vault (Chat) */}
+          {onOpenChatVault && (
+            <button
+              onClick={onOpenChatVault}
+              className="px-3 py-1.5 rounded-xl border border-rose-500/50 bg-gradient-to-r from-rose-950/70 via-pink-950/50 to-amber-950/60 hover:border-rose-400 text-rose-200 hover:text-white text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+              title="Open The Imperial Secret Vault (Passcode Protected Chat)"
+            >
+              <Heart className="w-3.5 h-3.5 fill-rose-400 text-rose-400 animate-pulse" />
+              <span>Secret Vault 💌</span>
+            </button>
+          )}
+
           {/* Date Night Pill */}
           <button
             onClick={() => onSelectTab('date-night')}
@@ -219,6 +233,19 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
         <div className="lg:hidden pt-3 pb-2 border-t border-emerald-900/60 mt-2 space-y-1.5 animate-in fade-in slide-in-from-top-2">
+          {onOpenChatVault && (
+            <button
+              onClick={() => {
+                onOpenChatVault();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-2.5 rounded-xl bg-gradient-to-r from-rose-950/80 via-pink-950/60 to-amber-950/70 border border-rose-500/50 text-xs font-bold text-rose-200 flex items-center gap-2 shadow-sm"
+            >
+              <Heart className="w-4 h-4 fill-rose-400 text-rose-400 animate-pulse" />
+              <span>💌 The Imperial Secret Vault (Private Chat)</span>
+            </button>
+          )}
+
           {onOpenGame && (
             <button
               onClick={() => {
