@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "LoveScroll": {
+      "title": "LoveScroll",
+      "description": "A live romantic message or decree sent between Sir Chif3n and Lady Leslye",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the love scroll"
+        },
+        "sender": {
+          "type": "string",
+          "description": "Display name of the sender"
+        },
+        "senderRole": {
+          "type": "string",
+          "enum": ["chif3n", "leslye", "demigod"],
+          "description": "Imperial role of the author"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Text body of the scroll"
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Unix timestamp in milliseconds"
+        }
+      },
+      "required": ["id", "sender", "senderRole", "text", "timestamp"]
+    },
+    "ArcadeState": {
+      "title": "ArcadeState",
+      "description": "Shared real-time game and presence state for Imperial Couple Arcade",
+      "type": "object",
+      "properties": {
+        "activeGame": {
+          "type": "string",
+          "enum": ["board", "trivia", "alchemy"],
+          "description": "Currently active arcade game"
+        },
+        "boardGame": {
+          "type": "object",
+          "description": "Board game state (TicTacToe and Gomoku)"
+        },
+        "triviaGame": {
+          "type": "object",
+          "description": "Trivia game state"
+        },
+        "alchemyGame": {
+          "type": "object",
+          "description": "Alchemy card matching game state"
+        },
+        "presence": {
+          "type": "object",
+          "description": "Presence indicators for Sir Chif3n and Lady Leslye"
+        },
+        "lastUpdated": {
+          "type": "number",
+          "description": "Unix timestamp in milliseconds of last move"
+        }
+      },
+      "required": ["activeGame", "lastUpdated"]
+    }
+  },
+  "firestore": {
+    "/loveScrolls/{scrollId}": {
+      "schema": "LoveScroll",
+      "description": "Collection of all live love scrolls and real-time chat messages between Sir Chif3n and Lady Leslye"
+    },
+    "/coupleArcade/{docId}": {
+      "schema": "ArcadeState",
+      "description": "Shared real-time state document for the 2-player imperial games across devices"
+    }
+  }
+}

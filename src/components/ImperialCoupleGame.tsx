@@ -25,6 +25,7 @@ import {
   Smartphone,
   Globe
 } from 'lucide-react';
+import { subscribeToArcadeCloud, syncArcadeToCloud } from '../services/firebase';
 
 interface ArcadePresence {
   chif3n: boolean;
@@ -355,7 +356,7 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
     } catch (e) {}
   };
 
-  // Save arcade state to local storage and broadcast channel
+  // Save arcade state to local storage, broadcast channel, and Cloud Firestore!
   const persistAndBroadcast = (newState: ArcadeState) => {
     setArcade(newState);
     try {
@@ -364,6 +365,11 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
         channelRef.current.postMessage({ type: 'arcade_update', arcade: newState });
       }
     } catch (e) {}
+
+    // Worldwide cloud sync to her phone/laptop via Cloud Firestore
+    syncArcadeToCloud(newState).then((ok) => {
+      if (ok) setSyncStatus('Cloud Live');
+    });
   };
 
   // Fetch latest state from server (with graceful error handling)
@@ -415,7 +421,20 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
       };
     }
 
-    // 2. Fetch from backend if available
+    // 2. Real-time Cloud Firestore subscription: Updates instantly across different phones & laptops
+    const unsubscribeCloud = subscribeToArcadeCloud((cloudArcade) => {
+      if (cloudArcade && cloudArcade.boardGame) {
+        setArcade((prev) => {
+          if (!prev || (cloudArcade.lastUpdated && cloudArcade.lastUpdated >= (prev.lastUpdated || 0))) {
+            return cloudArcade;
+          }
+          return prev;
+        });
+        setSyncStatus('Cloud Live');
+      }
+    });
+
+    // 3. Fetch from backend if available
     fetchArcadeState();
     sendPresencePing();
 
@@ -426,6 +445,7 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
     }, 2000);
 
     return () => {
+      unsubscribeCloud();
       clearInterval(interval);
       if (channelRef.current) {
         channelRef.current.close();

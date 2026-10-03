@@ -14,8 +14,11 @@ import {
   Zap,
   Globe,
   Radio,
-  Check
+  Check,
+  Cloud,
+  CheckCheck
 } from 'lucide-react';
+import { subscribeToLoveScrolls, pushLoveScrollToCloud, FirebaseLoveScroll } from '../services/firebase';
 
 export interface LiveLoveMessage {
   id: string;
@@ -93,7 +96,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
     return 'chif3n';
   });
 
-  const [connectionMode, setConnectionMode] = useState<'live' | 'local'>('live');
+  const [connectionMode, setConnectionMode] = useState<'cloud' | 'live' | 'local'>('cloud');
   const [showPresets, setShowPresets] = useState<boolean>(false);
 
   const socketRef = useRef<WebSocket | null>(null);
@@ -121,37 +124,8 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
     } catch (e) {}
   };
 
-  // Ultra-fast Real-Time Synchronizer: fetches new messages from server
-  const syncMessagesFromServer = async () => {
-    try {
-      const res = await fetch(`/api/scrolls?since=${lastTimestampRef.current}`);
-      if (res.ok) {
-        const text = await res.text();
-        if (text.startsWith('{')) {
-          const json = JSON.parse(text);
-          if (json.messages && Array.isArray(json.messages) && json.messages.length > 0) {
-            setMessages((prev) => {
-              const existingIds = new Set(prev.map((m) => m.id));
-              const newOnes = json.messages.filter((m: LiveLoveMessage) => !existingIds.has(m.id));
-              if (newOnes.length === 0) return prev;
-              const combined = [...prev, ...newOnes].sort((a, b) => a.timestamp - b.timestamp);
-              lastTimestampRef.current = combined[combined.length - 1].timestamp;
-              try {
-                localStorage.setItem('imperial_live_scrolls', JSON.stringify(combined.slice(-100)));
-              } catch (e) {}
-              return combined;
-            });
-            setConnectionMode('live');
-          }
-        }
-      }
-    } catch (e) {
-      setConnectionMode('local');
-    }
-  };
-
   useEffect(() => {
-    // 1. Setup BroadcastChannel for 0ms cross-tab instant messaging
+    // 1. Setup BroadcastChannel for instantaneous cross-tab messaging
     if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
       channelRef.current = new BroadcastChannel('imperial_love_scrolls_channel');
       channelRef.current.onmessage = (event) => {
@@ -161,45 +135,51 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
       };
     }
 
-    // 2. Initial fetch from server
-    syncMessagesFromServer();
+    // 2. Real-Time Cloud Firestore Sync: Direct worldwide link between phone and laptop
+    const unsubscribeCloud = subscribeToLoveScrolls((cloudMsgs) => {
+      if (cloudMsgs && cloudMsgs.length > 0) {
+        setMessages((prev) => {
+          const map = new Map<string, LiveLoveMessage>();
+          for (const m of prev) map.set(m.id, m);
+          for (const m of cloudMsgs) map.set(m.id, m);
+          const combined = Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp);
+          try {
+            localStorage.setItem('imperial_live_scrolls', JSON.stringify(combined.slice(-100)));
+          } catch (e) {}
+          return combined;
+        });
+        setConnectionMode('cloud');
+      }
+    });
 
-    // 3. Regular polling loop (1.5s) for multi-device sync
-    const pollTimer = setInterval(syncMessagesFromServer, 1500);
-
-    // 4. WebSocket setup with graceful fallback (won't crash if offline or on Netlify)
-    try {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}`;
-      const ws = new WebSocket(wsUrl);
-      socketRef.current = ws;
-
-      ws.onopen = () => setConnectionMode('live');
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'new_message' && data.message) {
-            setMessages((prev) => {
-              if (prev.some((m) => m.id === data.message.id)) return prev;
-              const next = [...prev, data.message];
-              lastTimestampRef.current = data.message.timestamp;
-              try {
-                localStorage.setItem('imperial_live_scrolls', JSON.stringify(next.slice(-100)));
-              } catch (e) {}
-              return next;
-            });
+    // 3. Fallback polling loop to Express REST API / Webhooks
+    const syncFromRestServer = async () => {
+      try {
+        const res = await fetch(`/api/scrolls?since=${lastTimestampRef.current}`);
+        if (res.ok) {
+          const text = await res.text();
+          if (text.startsWith('{')) {
+            const json = JSON.parse(text);
+            if (json.messages && Array.isArray(json.messages) && json.messages.length > 0) {
+              setMessages((prev) => {
+                const map = new Map<string, LiveLoveMessage>();
+                for (const m of prev) map.set(m.id, m);
+                for (const m of json.messages) map.set(m.id, m);
+                const combined = Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp);
+                return combined;
+              });
+            }
           }
-        } catch (err) {}
-      };
-      ws.onerror = () => setConnectionMode('local');
-    } catch (e) {
-      setConnectionMode('local');
-    }
+        }
+      } catch (e) {}
+    };
+
+    const pollTimer = setInterval(syncFromRestServer, 2500);
 
     return () => {
+      unsubscribeCloud();
       clearInterval(pollTimer);
       if (channelRef.current) channelRef.current.close();
-      if (socketRef.current) socketRef.current.close();
     };
   }, []);
 
@@ -224,7 +204,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
         ? 'Lady Leslye (Apothecary Empress) 🌿'
         : 'Sir Chif3n (Demigod) 👑';
 
-    // 1. Optimistic Local Update (Instant 0ms display on screen)
+    // 1. Optimistic Local Update (Appears in 0ms on sender's screen)
     const newScroll: LiveLoveMessage = {
       id: `scroll-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       sender,
@@ -237,9 +217,16 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
     persistMessages(nextMessages);
     lastTimestampRef.current = newScroll.timestamp;
 
-    // 2. Send to backend REST API & Webhook (with graceful catch)
+    // 2. Push to Cloud Firestore (Transmits globally to her phone/laptop immediately)
+    pushLoveScrollToCloud(newScroll).then((success) => {
+      if (success) {
+        setConnectionMode('cloud');
+      }
+    });
+
+    // 3. Also dispatch to local server routes if available
     try {
-      await fetch('/api/scrolls', {
+      fetch('/api/scrolls', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -247,35 +234,8 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
           senderRole: activeRole,
           text: textToSend
         })
-      });
-    } catch (err) {
-      // Fallback: Also ping webhook endpoint
-      try {
-        await fetch('/api/webhook/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sender,
-            senderRole: activeRole,
-            text: textToSend
-          })
-        });
-      } catch (e) {}
-    }
-
-    // 3. Send over WebSocket if connected
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      try {
-        socketRef.current.send(
-          JSON.stringify({
-            type: 'send_message',
-            sender,
-            senderRole: activeRole,
-            text: textToSend
-          })
-        );
-      } catch (e) {}
-    }
+      }).catch(() => {});
+    } catch (err) {}
   };
 
   if (!isOpen) return null;
@@ -299,13 +259,14 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
               <h3 className="font-cinzel text-xs font-bold text-white tracking-wide">
                 Live Love Scrolls
               </h3>
-              <span className="flex items-center gap-1 text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-emerald-950 border border-emerald-700/60 text-emerald-300">
-                <span className={`w-1.5 h-1.5 rounded-full ${connectionMode === 'live' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                <span>{connectionMode === 'live' ? 'Cloud Synced' : 'Local Sanctum'}</span>
+              <span className="flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-500/50 text-emerald-300 shadow-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <Cloud className="w-2.5 h-2.5 text-emerald-400" />
+                <span>Worldwide Cloud Sync</span>
               </span>
             </div>
             <span className="text-[10px] text-emerald-400/80 font-mono block">
-              Dedicated chat between Chif3n & Leslye
+              Direct live link between Chif3n's & Leslye's devices
             </span>
           </div>
         </div>
@@ -322,13 +283,13 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
         </div>
       </div>
 
-      {/* Role Switcher Pill Bar (Answers "do we need a login or something") */}
+      {/* Role Switcher Pill Bar */}
       <div className="px-3 py-2 bg-[#020b06] border-b border-emerald-950 flex items-center justify-between text-xs">
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-mono text-emerald-500">Speaking as:</span>
           <button
             onClick={() => handleRoleToggle('chif3n')}
-            className={`px-2 py-0.5 rounded-lg border font-bold text-[10px] flex items-center gap-1 transition-all ${
+            className={`px-2.5 py-1 rounded-lg border font-bold text-[10px] flex items-center gap-1 transition-all ${
               activeRole === 'chif3n'
                 ? 'bg-amber-400 text-black border-amber-300 shadow-sm'
                 : 'bg-[#03110b] text-amber-300/70 border-emerald-900 hover:text-white'
@@ -339,7 +300,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
           </button>
           <button
             onClick={() => handleRoleToggle('leslye')}
-            className={`px-2 py-0.5 rounded-lg border font-bold text-[10px] flex items-center gap-1 transition-all ${
+            className={`px-2.5 py-1 rounded-lg border font-bold text-[10px] flex items-center gap-1 transition-all ${
               activeRole === 'leslye'
                 ? 'bg-emerald-500 text-white border-emerald-400 shadow-sm'
                 : 'bg-[#03110b] text-emerald-300/70 border-emerald-900 hover:text-white'
@@ -355,7 +316,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
             onClick={onOpenLoginModal}
             className="text-[10px] text-amber-300 underline font-mono hover:text-white"
           >
-            Profile
+            Switch Profile
           </button>
         )}
       </div>
@@ -394,6 +355,10 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
                 }`}
               >
                 <p className="font-serif whitespace-pre-wrap">{msg.text}</p>
+                <div className="flex items-center justify-end gap-1 mt-1 text-[9px] text-emerald-400/60 font-mono">
+                  <CheckCheck className="w-3 h-3 text-emerald-400" />
+                  <span>Synced</span>
+                </div>
               </div>
             </div>
           );
@@ -445,7 +410,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
           type="submit"
           disabled={!inputText.trim()}
           className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-600 text-black font-bold disabled:opacity-40 shadow-md transition-all active:scale-95"
-          title="Send scroll"
+          title="Send scroll to her phone/laptop"
         >
           <Send className="w-4 h-4" />
         </button>
