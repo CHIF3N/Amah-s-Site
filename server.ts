@@ -428,18 +428,26 @@ app.get('/api/anime/sources', (req: Request, res: Response) => {
   // Multi-server endpoints from verified open community providers
   const servers = [
     {
-      id: 'vidsrc-to',
-      name: 'Jade Palace (VidSrc Alpha)',
+      id: 'vidsrc-cc',
+      name: 'VidSrc Alpha (v2 Primary)',
       tag: 'Fastest · HD 1080p',
-      embedUrl: `https://vidsrc.to/embed/anime/${malId}/${episode}`,
+      embedUrl: `https://vidsrc.cc/v2/embed/anime/${malId}/${episode}`,
       type: 'embed',
       isDefault: true
     },
     {
-      id: 'vidsrc-cc',
-      name: 'Imperial Archive (VidSrc Celestial)',
-      tag: 'Multi-Sub · Clean UI',
-      embedUrl: `https://vidsrc.cc/v2/embed/anime/${malId}/${episode}`,
+      id: 'embedsu',
+      name: 'EmbedSU (Secondary Resolver)',
+      tag: 'Cloud Resolver · Multi-Audio',
+      embedUrl: `https://embed.su/embed/anime/${malId}/${episode}`,
+      type: 'embed',
+      isDefault: false
+    },
+    {
+      id: 'vidsrc-to',
+      name: 'VidSrc To (Mirror)',
+      tag: 'Alternative Cloud Server',
+      embedUrl: `https://vidsrc.to/embed/anime/${malId}/${episode}`,
       type: 'embed',
       isDefault: false
     },

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Leaf, Heart, RefreshCw, Quote, Shield, Copy, Check, Wand2, FlaskConical } from 'lucide-react';
+import { Sparkles, Leaf, Heart, RefreshCw, Quote, Shield, Copy, Check, Wand2, FlaskConical, Download, Image as ImageIcon } from 'lucide-react';
+import { generateAndDownloadQuoteImage } from '../utils/quoteImageGenerator';
 
 export interface ApothecaryAffirmation {
   quote: string;
@@ -126,8 +127,31 @@ export const DailyApothecaryAffirmation: React.FC = () => {
   const [brewCount, setBrewCount] = useState<number>(1);
   const [isBrewing, setIsBrewing] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
   const [sparkleActive, setSparkleActive] = useState<boolean>(false);
   const [activeTheme, setActiveTheme] = useState<'all' | 'love' | 'wisdom' | 'health'>('all');
+
+  const handleDownloadImage = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsDownloading(true);
+    try {
+      await generateAndDownloadQuoteImage({
+        quote: affirmation.quote,
+        herb: affirmation.herb,
+        temperament: affirmation.temperament,
+        decree: affirmation.decree,
+        source: affirmation.source || "Sir Chif3n's Vow for Lady Leslye",
+        theme: activeTheme === 'love' ? 'rose-romance' : 'imperial-jade'
+      });
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 2500);
+    } catch (err) {
+      console.error('Failed to generate quote image:', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // Play mystical bubbling & crystal chime Web Audio sound
   const playPotionChime = () => {
@@ -308,6 +332,26 @@ export const DailyApothecaryAffirmation: React.FC = () => {
 
         {/* Action Controls & Brew Button */}
         <div className="shrink-0 flex items-center gap-2 self-end md:self-center" onClick={(e) => e.stopPropagation()}>
+          {/* Download Quote as Image Button */}
+          <button
+            onClick={handleDownloadImage}
+            disabled={isDownloading}
+            className="px-3 py-2 rounded-xl bg-[#03110b] hover:bg-emerald-950 text-amber-300 border border-amber-500/50 hover:border-amber-400 text-xs transition-all shadow-md active:scale-95 flex items-center gap-1.5 disabled:opacity-60"
+            title="Download this quote as a luxury imperial keepsake image"
+          >
+            {downloadSuccess ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[11px] font-cinzel font-bold text-emerald-400">Saved PNG!</span>
+              </>
+            ) : (
+              <>
+                <Download className={`w-3.5 h-3.5 text-amber-400 ${isDownloading ? 'animate-bounce' : ''}`} />
+                <span className="text-[11px] font-cinzel font-bold hidden sm:inline">Save as Image</span>
+              </>
+            )}
+          </button>
+
           {/* Copy Button */}
           <button
             onClick={handleCopy}

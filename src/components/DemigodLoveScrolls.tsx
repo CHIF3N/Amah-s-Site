@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Scroll, Heart, Sparkles, Send, ShieldCheck, Crown, Leaf, FlaskConical, Quote, MessageCircle } from 'lucide-react';
+import { Scroll, Heart, Sparkles, Send, ShieldCheck, Crown, Leaf, FlaskConical, Quote, MessageCircle, Download, Check } from 'lucide-react';
 import { DemigodScroll } from '../types/anime';
 import { MAOMAO_STATEMENTS_FOR_LESLYE } from '../data/curatedData';
 import { LiveLoveScrollChatbox } from './LiveLoveScrollChatbox';
+import { generateAndDownloadQuoteImage } from '../utils/quoteImageGenerator';
 
 interface DemigodLoveScrollsProps {
   scrolls: DemigodScroll[];
@@ -19,9 +20,31 @@ export const DemigodLoveScrolls: React.FC<DemigodLoveScrollsProps> = ({
 }) => {
   const [newNote, setNewNote] = useState('');
   const [activeStatementIndex, setActiveStatementIndex] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   const handleNextStatement = () => {
     setActiveStatementIndex((prev) => (prev + 1) % MAOMAO_STATEMENTS_FOR_LESLYE.length);
+  };
+
+  const handleDownloadStatement = async () => {
+    setIsDownloading(true);
+    try {
+      const activeQuote = MAOMAO_STATEMENTS_FOR_LESLYE[activeStatementIndex];
+      await generateAndDownloadQuoteImage({
+        quote: activeQuote,
+        author: 'Sir Chif3n',
+        source: 'The Imperial Love Scrolls',
+        decree: `Imperial Decree #${100 + activeStatementIndex}`,
+        theme: 'rose-romance'
+      });
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 2500);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handleSendNote = (e: React.FormEvent) => {
@@ -64,13 +87,34 @@ export const DemigodLoveScrolls: React.FC<DemigodLoveScrollsProps> = ({
                 {MAOMAO_STATEMENTS_FOR_LESLYE[activeStatementIndex]}
               </p>
             </div>
-            <button
-              onClick={handleNextStatement}
-              className="px-3.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-xs font-medium shrink-0 transition-colors flex items-center gap-1.5"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Next Statement for Her</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              <button
+                onClick={handleDownloadStatement}
+                disabled={isDownloading}
+                className="px-3 py-1.5 rounded-lg bg-black/60 hover:bg-emerald-950 text-amber-300 border border-amber-500/50 hover:border-amber-400 text-xs font-medium transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+                title="Download this love decree as an imperial image"
+              >
+                {downloadSuccess ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span className="text-[11px] font-cinzel font-bold text-emerald-400">Saved!</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className={`w-3.5 h-3.5 text-amber-400 ${isDownloading ? 'animate-bounce' : ''}`} />
+                    <span className="text-[11px] font-cinzel font-bold">Save Image</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleNextStatement}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-500/40 text-xs font-medium shrink-0 transition-colors flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Next Statement</span>
+              </button>
+            </div>
           </div>
         </div>
 

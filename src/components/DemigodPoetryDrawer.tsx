@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Scroll, Heart, Sparkles, X, ChevronRight, Quote, Feather } from 'lucide-react';
+import { Scroll, Heart, Sparkles, X, ChevronRight, Quote, Feather, Download, Check } from 'lucide-react';
 import { DEMIGOD_POEMS_AND_VOWS } from '../data/curatedData';
+import { generateAndDownloadQuoteImage } from '../utils/quoteImageGenerator';
 
 interface DemigodPoetryDrawerProps {
   isOpen: boolean;
@@ -9,8 +10,32 @@ interface DemigodPoetryDrawerProps {
 
 export const DemigodPoetryDrawer: React.FC<DemigodPoetryDrawerProps> = ({ isOpen, onClose }) => {
   const [activePoemIndex, setActivePoemIndex] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   if (!isOpen) return null;
+
+  const currentPoem = DEMIGOD_POEMS_AND_VOWS[activePoemIndex];
+
+  const handleDownloadPoem = async () => {
+    setIsDownloading(true);
+    try {
+      await generateAndDownloadQuoteImage({
+        quote: currentPoem.verse,
+        author: 'Sir Chif3n',
+        title: currentPoem.title,
+        decree: currentPoem.dedication,
+        source: "Sir Chif3n's Vows for Queen Leslye",
+        theme: 'antique-parchment'
+      });
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 2500);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
@@ -72,8 +97,26 @@ export const DemigodPoetryDrawer: React.FC<DemigodPoetryDrawerProps> = ({ isOpen
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between text-xs text-emerald-400/80">
-          <span>Solely dedicated to Queen Leslye</span>
+        <div className="flex items-center justify-between gap-3 text-xs text-emerald-400/80">
+          <button
+            onClick={handleDownloadPoem}
+            disabled={isDownloading}
+            className="px-3.5 py-2 rounded-xl bg-black/60 hover:bg-emerald-950 text-amber-300 border border-amber-500/50 hover:border-amber-400 font-medium transition-all shadow-md active:scale-95 flex items-center gap-1.5"
+            title="Download this poem as a keepsake parchment image"
+          >
+            {downloadSuccess ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="text-[11px] font-cinzel font-bold text-emerald-400">Saved Image!</span>
+              </>
+            ) : (
+              <>
+                <Download className={`w-3.5 h-3.5 text-amber-400 ${isDownloading ? 'animate-bounce' : ''}`} />
+                <span className="text-[11px] font-cinzel font-bold">Download Poem Image</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-medium"
