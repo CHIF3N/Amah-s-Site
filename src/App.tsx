@@ -124,6 +124,123 @@ export default function App() {
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Notification states & refs
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission === 'granted';
+    }
+    return false;
+  });
+  const [unreadScrollCount, setUnreadScrollCount] = useState<number>(0);
+  const [incomingAlert, setIncomingAlert] = useState<{
+    id: string;
+    sender: string;
+    preview: string;
+    timestamp: number;
+  } | null>(null);
+
+  const appStartTimeRef = useRef<number>(Date.now());
+  const lastNotifiedMessageIdRef = useRef<string | null>(null);
+
+  // Request browser notification permission
+  const handleToggleNotifications = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'granted') {
+        setNotificationsEnabled(true);
+        showToast('🔔 Background alerts are active and running!');
+        return;
+      }
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          setNotificationsEnabled(true);
+          showToast('🌿 Imperial Notifications Enabled! You will receive live alerts for new love scrolls.');
+          playHerbalChime();
+        } else {
+          setToastMessage('Notification permission was not granted in your browser settings.');
+        }
+      } catch (err) {
+        console.warn(err);
+      }
+    } else {
+      setToastMessage('Web notifications are not supported in this browser.');
+    }
+  };
+
+  // Reset unread count and dismiss floating banner when opening vault
+  useEffect(() => {
+    if (vaultOpen) {
+      setUnreadScrollCount(0);
+      setIncomingAlert(null);
+    }
+  }, [vaultOpen]);
+
+  // Real-Time Message Listener Notification Trigger (Two-Tier)
+  useEffect(() => {
+    const unsubscribe = subscribeToLoveScrolls((scrolls) => {
+      if (!scrolls || scrolls.length === 0) return;
+
+      const latest = scrolls[scrolls.length - 1];
+      if (!latest || !latest.id) return;
+
+      // Avoid double-notifying the exact same message
+      if (lastNotifiedMessageIdRef.current === latest.id) return;
+
+      // Freshness check: received within the last 15 seconds AND timestamp > appStartTimeRef.current - 5000
+      const isFresh = latest.timestamp > appStartTimeRef.current - 5000 && Date.now() - latest.timestamp < 15000;
+      const isFromOtherPerson = latest.senderRole !== activeRole;
+
+      if (isFresh && isFromOtherPerson) {
+        lastNotifiedMessageIdRef.current = latest.id;
+
+        const senderTitle = latest.senderRole === 'chif3n' ? 'Sir Chif3n' : 'Lady Leslye';
+        const preview =
+          latest.type === 'audio'
+            ? 'Sent a voice note 🎙️'
+            : latest.type === 'image'
+            ? 'Sent an image 📷'
+            : latest.text || 'Sent a love decree ✨';
+
+        // Case A: Tab is Minimized or in Background (document.hidden === true)
+        if (typeof document !== 'undefined' && document.hidden) {
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification(
+                latest.senderRole === 'chif3n' ? '🌿 Message from Sir Chif3n' : '🌸 Message from Lady Leslye',
+                {
+                  body: preview,
+                  icon: '/favicon.ico',
+                  tag: 'love-scroll-notification'
+                }
+              );
+            } catch (err) {
+              console.warn('System Notification error:', err);
+            }
+          }
+        } else {
+          // Case B: App is Active on Screen
+          // 1. Play gentle herbal chime sound
+          playHerbalChime();
+
+          // 2. Slide down floating frosted glass banner at the top of the screen
+          setIncomingAlert({
+            id: latest.id,
+            sender: senderTitle,
+            preview,
+            timestamp: latest.timestamp
+          });
+
+          // 3. Increment unread badge pill on chat icon/button
+          if (!vaultOpen) {
+            setUnreadScrollCount((prev) => prev + 1);
+          }
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [activeRole, vaultOpen]);
+
   useEffect(() => {
     const timer = setInterval(() => {
       setBannerStatementIdx((prev) => (prev + 1) % MAOMAO_STATEMENTS_FOR_LESLYE.length);
@@ -506,7 +623,50 @@ export default function App() {
         ambientMode={ambientMode}
         onToggleAmbient={handleToggleAmbient}
         dateNightCount={dateNightItems.length}
+        unreadMessagesCount={unreadScrollCount}
+        notificationsEnabled={notificationsEnabled}
+        onToggleNotifications={handleToggleNotifications}
       />
+
+      {/* Floating Frosted Glass Banner for Active App Screen */}
+      {incomingAlert && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-lg animate-in slide-in-from-top-4 duration-300">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-[#03150dcc] backdrop-blur-xl border border-rose-500/60 shadow-2xl flex items-center justify-between gap-3 text-white">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-rose-500/20 border border-rose-400/50 flex items-center justify-center shrink-0">
+                <Heart className="w-5 h-5 text-rose-400 fill-rose-400 animate-pulse" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-300">
+                  <span>💌 New Love Scroll from {incomingAlert.sender}</span>
+                </div>
+                <p className="text-xs font-serif text-emerald-200 truncate mt-0.5">
+                  "{incomingAlert.preview}"
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => {
+                  setVaultOpen(true);
+                  setIncomingAlert(null);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-cinzel text-xs font-bold shadow-md transition-all active:scale-95"
+              >
+                Open Vault
+              </button>
+              <button
+                onClick={() => setIncomingAlert(null)}
+                className="p-1.5 text-zinc-400 hover:text-white"
+                title="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 space-y-6 relative z-20">
@@ -906,6 +1066,8 @@ export default function App() {
           setActiveTab(tab);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
+        onOpenChatVault={() => setVaultOpen(true)}
+        unreadMessagesCount={unreadScrollCount}
       />
 
       {/* Anime Detail Modal */}
@@ -935,7 +1097,13 @@ export default function App() {
         >
           <Heart className="w-4 h-4 fill-white animate-pulse" />
           <span className="font-cinzel">Secret Vault 💌</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-300 ring-2 ring-emerald-500" />
+          {unreadScrollCount > 0 ? (
+            <span className="px-1.5 py-0.2 rounded-full bg-white text-rose-600 font-mono text-[10px] font-black animate-bounce shadow">
+              {unreadScrollCount}
+            </span>
+          ) : (
+            <span className="w-2 h-2 rounded-full bg-emerald-300 ring-2 ring-emerald-500" />
+          )}
         </button>
       )}
 
