@@ -21,7 +21,8 @@ import {
   Download,
   Film,
   Layers,
-  Sparkle
+  Sparkle,
+  Phone
 } from 'lucide-react';
 import { MoodHerbPill } from './MoodHerbPill';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -36,6 +37,7 @@ interface NavbarProps {
   onOpenGame?: () => void;
   onOpenLogin?: () => void;
   onOpenChatVault?: () => void;
+  onOpenCall?: () => void;
   onOpenDossier?: () => void;
   onOpenScrapbook?: () => void;
   activeRole?: 'chif3n' | 'leslye';
@@ -57,6 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenGame,
   onOpenLogin,
   onOpenChatVault,
+  onOpenCall,
   onOpenDossier,
   onOpenScrapbook,
   activeRole = 'chif3n',
@@ -315,6 +318,17 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Group 3: 💌 Secret Vault & Mood Herb (High Priority Quick-Trigger) */}
           <div className="flex items-center gap-1.5">
+            {onOpenCall && (
+              <button
+                onClick={onOpenCall}
+                className="px-3 py-1.5 rounded-xl border border-emerald-500/60 bg-gradient-to-r from-emerald-950/80 via-teal-950/70 to-emerald-900/60 hover:border-emerald-400 text-emerald-200 hover:text-white text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                title={activeRole === 'chif3n' ? 'Call Lady Leslye' : 'Call Sir Chif3n'}
+              >
+                <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Call {activeRole === 'chif3n' ? 'Leslye 🌿' : 'Chif3n 👑'}</span>
+              </button>
+            )}
+
             {onOpenChatVault && (
               <button
                 onClick={onOpenChatVault}
@@ -475,6 +489,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="text-[10px] font-mono uppercase tracking-wider text-rose-400 font-bold px-1">
               💌 Couple's Sanctum
             </span>
+
+            {onOpenCall && (
+              <button
+                onClick={() => {
+                  onOpenCall();
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full text-left p-2.5 rounded-xl bg-gradient-to-r from-emerald-950 via-teal-950 to-emerald-900 border border-emerald-500/60 font-bold text-emerald-200 flex items-center justify-between shadow-sm active:scale-98 transition-all"
+              >
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-emerald-400" />
+                  <span>Sacred Call ({activeRole === 'chif3n' ? 'Call Lady Leslye 🌿' : 'Call Sir Chif3n 👑'})</span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-300">Live Voice & Video</span>
+              </button>
+            )}
 
             {onOpenChatVault && (
               <button

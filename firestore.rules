@@ -2,28 +2,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isValidScroll(data) {
-      return data.id is string
-        && data.sender is string
-        && data.sender.size() > 0
-        && data.timestamp is number;
-    }
-
-    function isValidArcadeState(data) {
-      return (('activeGame' in data && data.activeGame is string) || ('gameId' in data && data.gameId is string));
-    }
-
     match /loveScrolls/{scrollId} {
-      allow read: if true;
-      allow create: if isValidScroll(request.resource.data);
-      allow update: if isValidScroll(request.resource.data);
-      allow delete: if false;
+      allow read, write: if true;
     }
 
     match /coupleArcade/{docId} {
-      allow read: if true;
-      allow create, update: if isValidArcadeState(request.resource.data);
-      allow delete: if false;
+      allow read, write: if true;
     }
 
     match /watchParty/{docId} {
@@ -35,6 +19,10 @@ service cloud.firestore {
     }
 
     match /timeCapsules/{capsuleId} {
+      allow read, write: if true;
+    }
+
+    match /coupleCall/{docId} {
       allow read, write: if true;
     }
   }

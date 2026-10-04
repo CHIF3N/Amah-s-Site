@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Search,
   Sparkles,
@@ -25,7 +25,9 @@ import {
   Bell,
   BellRing,
   Scroll,
-  Gamepad2
+  Gamepad2,
+  Phone,
+  PhoneOff
 } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
@@ -52,10 +54,18 @@ import { ApothecaryDossierModal } from './components/ApothecaryDossierModal';
 import { ImperialScrapbookModal } from './components/ImperialScrapbookModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PWAMobileFloatingBanner } from './components/PWAInstallButton';
+import { ImperialCallModal } from './components/ImperialCallModal';
 import { AnimeItem, DateNightItem, WatchHistoryItem, DailyWatchActivity } from './types/anime';
 import { CURATED_ANIME, DEMIGOD_SCROLLS, MAOMAO_STATEMENTS_FOR_LESLYE } from './data/curatedData';
 import { searchAnime, fetchRecentAnime, sortAnimeByRecent } from './services/jikanApi';
-import { subscribeToLoveScrolls } from './services/firebase';
+import {
+  subscribeToLoveScrolls,
+  subscribeToCallSession,
+  startCallSession,
+  answerCallSession,
+  endCallSession,
+  CoupleCallSession
+} from './services/firebase';
 
 /**
  * Gentle herbal chime synthesizer using Web Audio API harmonics
@@ -118,6 +128,8 @@ export default function App() {
   const [loginModalOpen, setLoginModalOpen] = useState(false);
   const [dossierModalOpen, setDossierModalOpen] = useState(false);
   const [scrapbookModalOpen, setScrapbookModalOpen] = useState(false);
+  const [callModalOpen, setCallModalOpen] = useState(false);
+  const [activeCallSession, setActiveCallSession] = useState<CoupleCallSession | null>(null);
   const [activeRole, setActiveRole] = useState<ImperialRole>(() => {
     try {
       const saved = localStorage.getItem('leslye_active_user');
@@ -127,6 +139,36 @@ export default function App() {
   });
 
   const [dailyWidgetsOpen, setDailyWidgetsOpen] = useState(true);
+
+  // Subscribe to real-time WebRTC audio & video call sessions
+  useEffect(() => {
+    const unsubscribe = subscribeToCallSession((session) => {
+      setActiveCallSession(session);
+      if (session && session.status === 'calling') {
+        if (session.receiverRole === activeRole) {
+          playHerbalChime();
+          setCallModalOpen(true);
+        }
+      } else if (session?.status === 'ended' || session?.status === 'declined') {
+        setCallModalOpen(false);
+      }
+    });
+    return () => unsubscribe();
+  }, [activeRole]);
+
+  const handleStartCall = async (type: 'audio' | 'video' = 'audio') => {
+    const partnerRole = activeRole === 'chif3n' ? 'leslye' : 'chif3n';
+    const callerName = activeRole === 'chif3n' ? 'Sir Chif3n (Demigod) 👑' : 'Lady Leslye (Apothecary Empress) 🌿';
+    await startCallSession({
+      callId: `call-${Date.now()}`,
+      callerRole: activeRole,
+      callerName,
+      receiverRole: partnerRole,
+      type,
+      status: 'calling'
+    });
+    setCallModalOpen(true);
+  };
 
   // Listen for service worker notification click message
   useEffect(() => {
@@ -476,11 +518,14 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Mark watched in history and increment weekly activity
-  const handleRecordHistory = (malId: number, ep: number) => {
-    const anime = currentPlayingAnime;
-    if (!anime) return;
+  // Mark watched in history and increment weekly activity (memoized to prevent re-render loop)
+  const handleRecordHistory = useCallback((malId: number, ep: number) => {
     setWatchHistory((prev) => {
+      const top = prev[0];
+      if (top && top.malId === malId && top.episode === ep) {
+        return prev; // already recorded, no state update needed
+      }
+      const anime = currentPlayingAnime;
       const filtered = prev.filter((item) => item.malId !== malId);
       const poster = anime?.images?.webp?.image_url || anime?.images?.jpg?.image_url || '';
       const updated: WatchHistoryItem = {
@@ -490,7 +535,7 @@ export default function App() {
         episode: ep,
         totalEpisodes: anime?.episodes || null,
         lastWatchedAt: Date.now(),
-        server: 'Vial I (API Resolver)',
+        server: 'VidLink / Imperial Resolver',
       };
       return [updated, ...filtered].slice(0, 10);
     });
@@ -504,7 +549,7 @@ export default function App() {
         return item;
       });
     });
-  };
+  }, [currentPlayingAnime]);
 
   const totalThisWeek = useMemo(() => {
     return activityData.reduce((acc, curr) => acc + (curr?.episodes || 0), 0);
@@ -688,6 +733,7 @@ export default function App() {
         onOpenLogin={() => setLoginModalOpen(true)}
         onOpenDossier={() => setDossierModalOpen(true)}
         onOpenScrapbook={() => setScrapbookModalOpen(true)}
+        onOpenCall={() => handleStartCall('audio')}
         activeRole={activeRole}
         ambientMode={ambientMode}
         onToggleAmbient={handleToggleAmbient}
@@ -696,6 +742,48 @@ export default function App() {
         notificationsEnabled={notificationsEnabled}
         onToggleNotifications={handleToggleNotifications}
       />
+
+      {/* Incoming Call Real-Time Floating Banner */}
+      {activeCallSession && activeCallSession.status === 'calling' && activeCallSession.receiverRole === activeRole && !callModalOpen && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-[92%] max-w-lg">
+          <div className="p-3.5 sm:p-4 rounded-2xl bg-[#03150dee] backdrop-blur-xl border-2 border-emerald-400 shadow-2xl flex items-center justify-between gap-3 text-white animate-bounce">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center shrink-0">
+                <Phone className="w-5 h-5 text-emerald-400 animate-pulse" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-amber-300">
+                  <span>📞 Incoming {activeCallSession.type === 'video' ? 'Video' : 'Voice'} Call</span>
+                </div>
+                <p className="text-xs font-serif text-emerald-200 truncate mt-0.5 font-bold">
+                  {activeCallSession.callerName} is calling you!
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => endCallSession()}
+                className="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-cinzel font-bold shadow-md active:scale-95 transition-all"
+                title="Decline Call"
+              >
+                <PhoneOff className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => {
+                  setCallModalOpen(true);
+                  answerCallSession({ status: 'connected' });
+                }}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 text-black text-xs font-cinzel font-bold shadow-md active:scale-95 transition-all flex items-center gap-1.5"
+              >
+                <Phone className="w-3.5 h-3.5 fill-black" />
+                <span>Answer</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating Frosted Glass Banner for Active App Screen */}
       {incomingAlert && (
@@ -931,7 +1019,7 @@ export default function App() {
 
         {/* Tab 1: Anime Catalog (Browse & Airing) */}
         {(activeTab === 'browse' || activeTab === 'airing') && (
-          <div className="space-y-6 animate-in fade-in">
+          <div className="space-y-6">
             {/* Collapsible Daily Decree & Cuddle Planning Section */}
             {!searchResults && !currentPlayingAnime && (
               <div className="space-y-3">
@@ -949,7 +1037,7 @@ export default function App() {
                 </div>
 
                 {dailyWidgetsOpen && (
-                  <div className="space-y-4 animate-in fade-in duration-200">
+                  <div className="space-y-4">
                     <DateNightCountdownWidget
                       firstItem={dateNightItems[0]}
                       onPlayAnime={(id, title) => {
@@ -1124,7 +1212,7 @@ export default function App() {
 
         {/* Tab 4: Demigod's Picks / Sacred Vault */}
         {activeTab === 'demigod-picks' && (
-          <div className="space-y-6 animate-in fade-in">
+          <div className="space-y-6">
             <div className="p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-[#06241a] via-[#04150f] to-[#0c261c] border border-amber-500/40">
               <div className="max-w-2xl">
                 <span className="font-cinzel text-xs font-bold text-amber-300 uppercase tracking-widest block mb-1">
@@ -1222,6 +1310,7 @@ export default function App() {
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onOpenChatVault={() => setVaultOpen(true)}
+        onOpenCall={() => handleStartCall('audio')}
         unreadMessagesCount={unreadScrollCount}
       />
 
@@ -1241,6 +1330,16 @@ export default function App() {
         isOpen={vaultOpen}
         onClose={() => setVaultOpen(false)}
         onOpenLoginModal={() => setLoginModalOpen(true)}
+        onStartCall={handleStartCall}
+      />
+
+      {/* Imperial Voice & Video Call Modal */}
+      <ImperialCallModal
+        isOpen={callModalOpen}
+        onClose={() => setCallModalOpen(false)}
+        activeRole={activeRole}
+        session={activeCallSession}
+        onStartCall={handleStartCall}
       />
 
       {/* The Apothecary Incident Dossier (Season 2, Season 3 & Movie) */}

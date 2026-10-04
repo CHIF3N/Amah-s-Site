@@ -162,6 +162,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [danmakuList, setDanmakuList] = useState<Array<{ id: string; text?: string; icon: string; top: number }>>([]);
   const lastDanmakuIdRef = useRef<string | null>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
+  const recordedEpisodeRef = useRef<string | null>(null);
 
   const animeId = anime?.mal_id || 54492;
   const animeTitle = anime?.title_english || anime?.title || 'Anime';
@@ -169,18 +170,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const currentServer = STREAM_SERVERS[selectedServerIndex] || STREAM_SERVERS[0];
   const streamUrl = currentServer.buildUrl(animeId, episode);
 
+  // Safely record watch history once per anime + episode (prevents infinite re-render loop)
   useEffect(() => {
-    if (onMarkWatched && anime?.mal_id) {
+    const key = `${anime?.mal_id}-${episode}`;
+    if (onMarkWatched && anime?.mal_id && recordedEpisodeRef.current !== key) {
+      recordedEpisodeRef.current = key;
       onMarkWatched(anime.mal_id, episode);
     }
-  }, [anime?.mal_id, episode, onMarkWatched]);
+  }, [anime?.mal_id, episode]);
 
   // Flash loader on change, then reveal player
   useEffect(() => {
     setIsFrameLoading(true);
     const timer = setTimeout(() => {
       setIsFrameLoading(false);
-    }, 1200);
+    }, 800);
     return () => clearTimeout(timer);
   }, [episode, selectedServerIndex, reloadKey]);
 
@@ -449,14 +453,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </span>
             </div>
 
-            {/* Subtle Loading Pulse Overlay (Fades out quickly) */}
+            {/* Non-intrusive Loading Indicator (never covers viewport in black) */}
             {isFrameLoading && (
-              <div className="absolute inset-0 z-10 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center text-center space-y-2 pointer-events-none transition-opacity duration-300">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/50 flex items-center justify-center animate-pulse">
-                  <Play className="w-5 h-5 text-emerald-400 fill-emerald-400 ml-0.5" />
-                </div>
-                <span className="text-xs font-cinzel text-emerald-200">
-                  Channeling {currentServer.name}...
+              <div className="absolute top-3 right-3 z-20 px-3 py-1.5 rounded-xl bg-[#021008e6] border border-emerald-400/50 flex items-center gap-2 shadow-xl pointer-events-none animate-in fade-in">
+                <RotateCw className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+                <span className="text-[11px] font-mono text-emerald-200">
+                  Loading {currentServer.shortName}...
                 </span>
               </div>
             )}

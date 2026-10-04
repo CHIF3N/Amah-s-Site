@@ -5,6 +5,7 @@ interface BottomNavProps {
   activeTab: 'browse' | 'manga' | 'novels' | 'demigod-picks';
   onSelectTab: (tab: 'browse' | 'manga' | 'novels' | 'demigod-picks') => void;
   onOpenChatVault?: () => void;
+  onOpenCall?: () => void;
   unreadMessagesCount?: number;
 }
 
@@ -12,6 +13,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   onSelectTab,
   onOpenChatVault,
+  onOpenCall,
   unreadMessagesCount = 0
 }) => {
   return (
@@ -63,6 +65,16 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         <span className="text-sm">👑</span>
         <span className="text-[10px] tracking-tight">Picks ❤️</span>
       </button>
+
+      {onOpenCall && (
+        <button
+          onClick={onOpenCall}
+          className="flex-1 py-1.5 px-2 rounded-xl flex flex-col items-center gap-1 transition-all text-emerald-300 hover:text-white"
+        >
+          <span className="text-sm">📞</span>
+          <span className="text-[10px] tracking-tight">Call</span>
+        </button>
+      )}
 
       {onOpenChatVault && (
         <button

@@ -5,6 +5,8 @@ import {
   doc,
   setDoc,
   addDoc,
+  updateDoc,
+  arrayUnion,
   onSnapshot,
   query,
   orderBy,
@@ -44,6 +46,7 @@ export interface FirebaseLoveScroll {
   imageUrl?: string;
   caption?: string;
   timestamp: number;
+  readBy?: string[];
 }
 
 /**
@@ -70,7 +73,8 @@ export function subscribeToLoveScrolls(onUpdate: (messages: FirebaseLoveScroll[]
               duration: data.duration,
               imageUrl: data.imageUrl,
               caption: data.caption,
-              timestamp: data.timestamp || Date.now()
+              timestamp: data.timestamp || Date.now(),
+              readBy: Array.isArray(data.readBy) ? data.readBy : [data.senderRole || 'demigod']
             });
           }
         });
@@ -98,7 +102,8 @@ export async function pushLoveScrollToCloud(scroll: FirebaseLoveScroll): Promise
       sender: scroll.sender,
       senderRole: scroll.senderRole,
       type: scroll.type || 'text',
-      timestamp: scroll.timestamp
+      timestamp: scroll.timestamp,
+      readBy: scroll.readBy || [scroll.senderRole]
     };
     if (scroll.text !== undefined) payload.text = scroll.text;
     if (scroll.audioUrl) payload.audioUrl = scroll.audioUrl;
@@ -111,6 +116,36 @@ export async function pushLoveScrollToCloud(scroll: FirebaseLoveScroll): Promise
   } catch (err) {
     console.error('[Firestore] Failed to save love scroll:', err);
     return false;
+  }
+}
+
+/**
+ * Mark messages in Cloud Firestore as read by a specific partner role (Sir Chif3n or Lady Leslye).
+ */
+export async function markLoveScrollsAsRead(
+  userRole: 'chif3n' | 'leslye',
+  messagesToMark: FirebaseLoveScroll[]
+): Promise<void> {
+  if (!messagesToMark || messagesToMark.length === 0) return;
+
+  const unreadMessages = messagesToMark.filter((m) => {
+    // Only mark messages sent by the other partner that haven't been marked yet
+    return m.senderRole !== userRole && (!m.readBy || !m.readBy.includes(userRole));
+  });
+
+  if (unreadMessages.length === 0) return;
+
+  try {
+    const updatePromises = unreadMessages.map(async (msg) => {
+      const docRef = doc(db, 'loveScrolls', msg.id);
+      await updateDoc(docRef, {
+        readBy: arrayUnion(userRole)
+      });
+    });
+
+    await Promise.all(updatePromises);
+  } catch (err) {
+    console.warn('[Firestore] Error marking messages as read:', err);
   }
 }
 
@@ -389,4 +424,110 @@ export async function saveTimeLockedCapsule(capsule: TimeLockedCapsule): Promise
     return false;
   }
 }
+
+// =========================================================================
+// IMPERIAL VOICE & VIDEO CALL SIGNALING ENGINE (Real-Time WebRTC Link)
+// =========================================================================
+
+export interface CoupleCallSession {
+  callId: string;
+  callerRole: 'chif3n' | 'leslye';
+  callerName: string;
+  receiverRole: 'chif3n' | 'leslye';
+  type: 'audio' | 'video';
+  status: 'calling' | 'connected' | 'ended' | 'declined';
+  timestamp: number;
+  offer?: any;
+  answer?: any;
+  callerCandidates?: any[];
+  receiverCandidates?: any[];
+}
+
+/**
+ * Real-time listener for incoming & ongoing calls between Sir Chif3n and Lady Leslye.
+ */
+export function subscribeToCallSession(onUpdate: (session: CoupleCallSession | null) => void): () => void {
+  try {
+    const docRef = doc(db, 'coupleCall', 'current_session');
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as CoupleCallSession;
+          onUpdate(data);
+        } else {
+          onUpdate(null);
+        }
+      },
+      (err) => {
+        console.warn('[Firestore] call session listener warning:', err);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('[Firestore] Error subscribing to call session:', err);
+    return () => {};
+  }
+}
+
+/**
+ * Initiate an Imperial Voice or Video Call
+ */
+export async function startCallSession(session: Omit<CoupleCallSession, 'timestamp'>): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'coupleCall', 'current_session');
+    await setDoc(docRef, {
+      ...session,
+      timestamp: Date.now()
+    });
+    return true;
+  } catch (err) {
+    console.error('[Firestore] Failed to start call session:', err);
+    return false;
+  }
+}
+
+/**
+ * Answer an incoming call with SDP Answer and status 'connected'
+ */
+export async function answerCallSession(answerPayload: { answer?: any; status: 'connected' | 'declined' }): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'coupleCall', 'current_session');
+    await setDoc(docRef, answerPayload, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[Firestore] Failed to answer call session:', err);
+    return false;
+  }
+}
+
+/**
+ * Add an ICE candidate during WebRTC peer negotiation
+ */
+export async function addCallIceCandidate(role: 'caller' | 'receiver', candidate: any): Promise<void> {
+  try {
+    const docRef = doc(db, 'coupleCall', 'current_session');
+    const field = role === 'caller' ? 'callerCandidates' : 'receiverCandidates';
+    await updateDoc(docRef, {
+      [field]: arrayUnion(JSON.stringify(candidate))
+    });
+  } catch (err) {
+    console.warn('[Firestore] Could not push ICE candidate:', err);
+  }
+}
+
+/**
+ * End or terminate the active call session
+ */
+export async function endCallSession(): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'coupleCall', 'current_session');
+    await setDoc(docRef, { status: 'ended', endedAt: Date.now() }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[Firestore] Failed to end call session:', err);
+    return false;
+  }
+}
+
 

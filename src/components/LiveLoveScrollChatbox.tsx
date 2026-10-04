@@ -16,7 +16,8 @@ import {
   Radio,
   Check,
   Cloud,
-  CheckCheck
+  CheckCheck,
+  Phone
 } from 'lucide-react';
 import { subscribeToLoveScrolls, pushLoveScrollToCloud, FirebaseLoveScroll } from '../services/firebase';
 
@@ -38,6 +39,7 @@ interface LiveLoveScrollChatboxProps {
   isOpen?: boolean;
   onClose?: () => void;
   onOpenLoginModal?: () => void;
+  onStartCall?: (type: 'audio' | 'video') => void;
 }
 
 const SEEDED_DEFAULT_SCROLLS: LiveLoveMessage[] = [
@@ -89,7 +91,8 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
   isFloating = false,
   isOpen = true,
   onClose,
-  onOpenLoginModal
+  onOpenLoginModal,
+  onStartCall
 }) => {
   const [messages, setMessages] = useState<LiveLoveMessage[]>(() => getStoredMessages());
   const [inputText, setInputText] = useState<string>('');
@@ -157,33 +160,8 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
       }
     });
 
-    // 3. Fallback polling loop to Express REST API / Webhooks
-    const syncFromRestServer = async () => {
-      try {
-        const res = await fetch(`/api/scrolls?since=${lastTimestampRef.current}`);
-        if (res.ok) {
-          const text = await res.text();
-          if (text.startsWith('{')) {
-            const json = JSON.parse(text);
-            if (json.messages && Array.isArray(json.messages) && json.messages.length > 0) {
-              setMessages((prev) => {
-                const map = new Map<string, LiveLoveMessage>();
-                for (const m of prev) map.set(m.id, m);
-                for (const m of json.messages) map.set(m.id, m);
-                const combined = Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp);
-                return combined;
-              });
-            }
-          }
-        }
-      } catch (e) {}
-    };
-
-    const pollTimer = setInterval(syncFromRestServer, 2500);
-
     return () => {
       unsubscribeCloud();
-      clearInterval(pollTimer);
       if (channelRef.current) channelRef.current.close();
     };
   }, []);
@@ -277,6 +255,16 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5">
+          {onStartCall && (
+            <button
+              onClick={() => onStartCall('audio')}
+              className="p-1 rounded-lg text-emerald-400 hover:text-white hover:bg-emerald-950 transition-colors"
+              title="Start Sacred Call"
+            >
+              <Phone className="w-4 h-4 text-emerald-400" />
+            </button>
+          )}
+
           {onClose && (
             <button
               onClick={onClose}

@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   Cloud,
   CheckCheck,
+  Check,
   Key,
   AlertCircle,
   Eye,
@@ -24,11 +25,14 @@ import {
   Download,
   Volume2,
   Bell,
-  BellRing
+  BellRing,
+  Phone,
+  Video
 } from 'lucide-react';
 import {
   subscribeToLoveScrolls,
   pushLoveScrollToCloud,
+  markLoveScrollsAsRead,
   FirebaseLoveScroll
 } from '../services/firebase';
 
@@ -43,12 +47,14 @@ export interface LiveLoveMessage {
   imageUrl?: string;
   caption?: string;
   timestamp: number;
+  readBy?: string[];
 }
 
 interface ImperialChatVaultProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenLoginModal?: () => void;
+  onStartCall?: (type: 'audio' | 'video') => void;
 }
 
 const SEEDED_DEFAULT_SCROLLS: LiveLoveMessage[] = [
@@ -233,7 +239,8 @@ const ApothecaryAudioPlayer: React.FC<{ audioUrl: string; duration?: number; isC
 export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
   isOpen,
   onClose,
-  onOpenLoginModal
+  onOpenLoginModal,
+  onStartCall
 }) => {
   // Passcode gate state: check sessionStorage for unlocked status
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -283,6 +290,7 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const passcodeInputRef = useRef<HTMLInputElement>(null);
+  const markedReadIdsRef = useRef<Set<string>>(new Set());
 
   // Focus passcode input when opening gate
   useEffect(() => {
@@ -293,12 +301,21 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
     }
   }, [isOpen, isUnlocked]);
 
-  // Real-time Firestore sync
+  // Real-time Firestore sync & Mark-as-read trigger
   useEffect(() => {
     if (!isOpen || !isUnlocked) return;
 
     const unsubscribeCloud = subscribeToLoveScrolls((cloudMsgs) => {
       if (cloudMsgs && cloudMsgs.length > 0) {
+        // Only mark messages that haven't been marked during this session yet
+        const toMark = cloudMsgs.filter(
+          (m) => m.senderRole !== activeRole && !markedReadIdsRef.current.has(m.id) && !m.readBy?.includes(activeRole)
+        );
+        if (toMark.length > 0) {
+          toMark.forEach((m) => markedReadIdsRef.current.add(m.id));
+          markLoveScrollsAsRead(activeRole, toMark);
+        }
+
         setMessages((prev) => {
           const map = new Map<string, LiveLoveMessage>();
           for (const m of prev) map.set(m.id, m);
@@ -315,7 +332,7 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
     return () => {
       unsubscribeCloud();
     };
-  }, [isOpen, isUnlocked]);
+  }, [isOpen, isUnlocked, activeRole]);
 
   // Auto-scroll to latest message
   useEffect(() => {
@@ -513,7 +530,8 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
       duration: payload.duration,
       imageUrl: payload.imageUrl,
       caption: payload.caption,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      readBy: [activeRole]
     };
 
     // Optimistic local update
@@ -631,7 +649,7 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
 
   // 2. Full-Screen Imperial Archive View
   return (
-    <div className="fixed inset-0 z-50 bg-[#090e0b] flex flex-col animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-50 bg-[#090e0b] flex flex-col">
       {/* Top Navigation & Status Bar */}
       <header className="px-4 sm:px-6 py-3.5 bg-[#05110a] border-b border-emerald-900/80 flex items-center justify-between gap-3 shadow-md shrink-0">
         <div className="flex items-center gap-3">
@@ -666,6 +684,29 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
               Cloud Synchronized
             </span>
           </div>
+
+          {/* Alert Permission Button */}
+          {onStartCall && (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => onStartCall('audio')}
+                className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-950 via-teal-950 to-emerald-900 border border-emerald-500/60 hover:border-emerald-400 text-emerald-200 text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                title="Start Voice Call"
+              >
+                <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden md:inline">Voice Call</span>
+              </button>
+
+              <button
+                onClick={() => onStartCall('video')}
+                className="px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-950 via-yellow-950 to-amber-900 border border-amber-500/60 hover:border-amber-400 text-amber-200 text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                title="Start Video Call"
+              >
+                <Video className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden md:inline">Video Call</span>
+              </button>
+            </div>
+          )}
 
           {/* Alert Permission Button */}
           <button
@@ -760,11 +801,14 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
         {messages.map((msg) => {
           const isMe = msg.senderRole === activeRole;
           const isChif3n = msg.senderRole === 'chif3n';
+          const partnerRole = activeRole === 'chif3n' ? 'leslye' : 'chif3n';
+          const partnerTitle = activeRole === 'chif3n' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑';
+          const isReadByPartner = Array.isArray(msg.readBy) && msg.readBy.includes(partnerRole);
 
           return (
             <div
               key={msg.id}
-              className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate-in fade-in duration-200`}
+              className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
             >
               {/* Header Info */}
               <div className="flex items-center gap-1.5 text-xs font-mono mb-1 text-emerald-400/90 px-1">
@@ -824,10 +868,27 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
                   <p className="font-serif whitespace-pre-wrap">{msg.text}</p>
                 )}
 
-                <div className="flex items-center justify-end gap-1.5 mt-2 text-[10px] text-emerald-400/70 font-mono">
-                  <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Cloud Synced</span>
-                </div>
+                {/* Delivery and Read Status Checkmarks */}
+                {isMe ? (
+                  <div className="flex items-center justify-end gap-1.5 mt-2 text-[10px] font-mono">
+                    {isReadByPartner ? (
+                      <div className="flex items-center gap-1 text-amber-300 drop-shadow-sm font-medium">
+                        <CheckCheck className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Read by {partnerTitle} ✓</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-emerald-400/70">
+                        <Check className="w-3 h-3 text-emerald-400/80" />
+                        <span>Delivered</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-start gap-1 mt-2 text-[10px] font-mono text-emerald-400/50">
+                    <CheckCheck className="w-3 h-3 text-emerald-400/70" />
+                    <span>Received</span>
+                  </div>
+                )}
               </div>
             </div>
           );

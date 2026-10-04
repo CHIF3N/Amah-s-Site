@@ -46,6 +46,13 @@
         "timestamp": {
           "type": "number",
           "description": "Unix timestamp in milliseconds"
+        },
+        "readBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of participant roles who have opened and read this message (e.g. ['chif3n', 'leslye'])"
         }
       },
       "required": ["id", "sender", "timestamp"]
@@ -83,6 +90,23 @@
         }
       },
       "required": ["gameId", "turn"]
+    },
+    "CoupleCallSession": {
+      "title": "CoupleCallSession",
+      "description": "Real-time voice and video call signaling session between Sir Chif3n and Lady Leslye",
+      "type": "object",
+      "properties": {
+        "callId": { "type": "string" },
+        "callerRole": { "type": "string", "enum": ["chif3n", "leslye"] },
+        "receiverRole": { "type": "string", "enum": ["chif3n", "leslye"] },
+        "type": { "type": "string", "enum": ["audio", "video"] },
+        "status": { "type": "string", "enum": ["calling", "connected", "ended", "declined"] },
+        "timestamp": { "type": "number" },
+        "offer": { "type": "string" },
+        "answer": { "type": "string" },
+        "candidate": { "type": "string" }
+      },
+      "required": ["callId", "callerRole", "status", "timestamp"]
     }
   },
   "firestore": {
@@ -93,6 +117,10 @@
     "/coupleArcade/{docId}": {
       "schema": "ArcadeCloudState",
       "description": "Shared real-time state document for the 2-player imperial games across devices"
+    },
+    "/coupleCall/{docId}": {
+      "schema": "CoupleCallSession",
+      "description": "Shared real-time WebRTC audio and video call signaling document between the couple"
     }
   }
 }
