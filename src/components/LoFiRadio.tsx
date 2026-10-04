@@ -10,7 +10,11 @@ import {
   X,
   ChevronDown,
   Flame,
-  Wind
+  Wind,
+  Bell,
+  Clock,
+  Sliders,
+  Moon
 } from 'lucide-react';
 
 interface Station {
@@ -101,18 +105,30 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentStationIdx, setCurrentStationIdx] = useState<number>(0);
   const [volume, setVolume] = useState<number>(0.35);
-  const [rainEnabled, setRainEnabled] = useState<boolean>(true);
-  const [crackleEnabled, setCrackleEnabled] = useState<boolean>(true);
+
+  // Multi-layer fader volumes
+  const [rainVol, setRainVol] = useState<number>(0.25);
+  const [chimesVol, setChimesVol] = useState<number>(0.20);
+  const [hearthVol, setHearthVol] = useState<number>(0.15);
+  const [cricketsVol, setCricketsVol] = useState<number>(0.10);
+
+  // Sleep timer states (in seconds)
+  const [sleepTimerSeconds, setSleepTimerSeconds] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'stations' | 'mixer'>('stations');
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const rainGainRef = useRef<GainNode | null>(null);
-  const crackleGainRef = useRef<GainNode | null>(null);
+  const chimesGainRef = useRef<GainNode | null>(null);
+  const hearthGainRef = useRef<GainNode | null>(null);
+  const cricketsGainRef = useRef<GainNode | null>(null);
+
   const chordTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const chimesTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const currentStation = STATIONS[currentStationIdx];
 
-  // Initialize Web Audio graph
+  // Initialize Web Audio Graph
   const initAudio = () => {
     if (!audioCtxRef.current) {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -150,7 +166,7 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
       rainFilter.frequency.setValueAtTime(750, ctx.currentTime);
 
       const rainGain = ctx.createGain();
-      rainGain.gain.setValueAtTime(rainEnabled ? 0.12 : 0, ctx.currentTime);
+      rainGain.gain.setValueAtTime(rainVol, ctx.currentTime);
 
       noiseSource.connect(rainFilter);
       rainFilter.connect(rainGain);
@@ -158,11 +174,23 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
       noiseSource.start();
       rainGainRef.current = rainGain;
 
-      // 2. Vinyl crackle generator
-      const crackleGain = ctx.createGain();
-      crackleGain.gain.setValueAtTime(crackleEnabled ? 0.04 : 0, ctx.currentTime);
-      crackleGain.connect(master);
-      crackleGainRef.current = crackleGain;
+      // 2. Chimes Master Gain
+      const chimesGain = ctx.createGain();
+      chimesGain.gain.setValueAtTime(chimesVol, ctx.currentTime);
+      chimesGain.connect(master);
+      chimesGainRef.current = chimesGain;
+
+      // 3. Hearth Crackle Master Gain
+      const hearthGain = ctx.createGain();
+      hearthGain.gain.setValueAtTime(hearthVol, ctx.currentTime);
+      hearthGain.connect(master);
+      hearthGainRef.current = hearthGain;
+
+      // 4. Crickets Master Gain
+      const cricketsGain = ctx.createGain();
+      cricketsGain.gain.setValueAtTime(cricketsVol, ctx.currentTime);
+      cricketsGain.connect(master);
+      cricketsGainRef.current = cricketsGain;
     }
 
     if (audioCtxRef.current.state === 'suspended') {
@@ -170,13 +198,34 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
     }
   };
 
-  // Play rich resonant acoustic piano note
+  // Trigger synthesized bamboo wind chime
+  const playWindChime = (freq: number) => {
+    if (!audioCtxRef.current || !chimesGainRef.current || chimesVol <= 0.01) return;
+    const ctx = audioCtxRef.current;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now);
+
+    const dur = 1.8;
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+    osc.connect(gain);
+    gain.connect(chimesGainRef.current);
+    osc.start(now);
+    osc.stop(now + dur);
+  };
+
+  // Play piano note
   const playPianoNote = (freq: number, duration: number, delay: number) => {
     if (!audioCtxRef.current || !masterGainRef.current) return;
     const ctx = audioCtxRef.current;
     const now = ctx.currentTime + delay;
 
-    // Dual oscillator for rich piano hammer overtones
     const oscMain = ctx.createOscillator();
     const oscOvertone = ctx.createOscillator();
     const noteGain = ctx.createGain();
@@ -185,16 +234,13 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
     oscMain.type = currentStation.waveform;
     oscMain.frequency.setValueAtTime(freq, now);
 
-    // Overtone 2nd harmonic with slight detune for warm acoustic chorusing
     oscOvertone.type = 'sine';
     oscOvertone.frequency.setValueAtTime(freq * 2 + (Math.random() * 0.4 - 0.2), now);
 
-    // Dynamic lowpass filter (piano hammer dynamics)
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(currentStation.filterFreq, now);
     filter.frequency.exponentialRampToValueAtTime(300, now + duration);
 
-    // Piano strike envelope: fast attack, natural acoustic decay
     noteGain.gain.setValueAtTime(0, now);
     noteGain.gain.linearRampToValueAtTime(0.09, now + 0.02);
     noteGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
@@ -210,48 +256,93 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
     oscOvertone.stop(now + duration);
   };
 
-  // Sequence piano progression loop
+  // Sequencer loop
   useEffect(() => {
     if (!isPlaying) {
       if (chordTimerRef.current) clearInterval(chordTimerRef.current);
+      if (chimesTimerRef.current) clearInterval(chimesTimerRef.current);
       return;
     }
 
     initAudio();
 
-    const triggerPianoChords = () => {
+    // 1. Piano sequence
+    chordTimerRef.current = setInterval(() => {
       const freqs = currentStation.baseFreqs;
-      // Arpeggiate 3 to 5 notes
-      const count = 3 + Math.floor(Math.random() * 3);
+      const count = Math.random() > 0.4 ? 3 : 2;
       for (let i = 0; i < count; i++) {
         const randFreq = freqs[Math.floor(Math.random() * freqs.length)];
-        const octave = Math.random() > 0.4 ? 1 : 2;
-        const noteDelay = i * 0.45;
-        playPianoNote(randFreq * octave, 3.8, noteDelay);
+        const delay = i * (0.18 + Math.random() * 0.08);
+        const dur = 2.4 + Math.random() * 1.5;
+        playPianoNote(randFreq, dur, delay);
       }
-    };
+    }, 2800);
 
-    triggerPianoChords();
-    chordTimerRef.current = setInterval(triggerPianoChords, 3500);
+    // 2. Wind chimes periodic burst
+    chimesTimerRef.current = setInterval(() => {
+      if (Math.random() > 0.3) {
+        const chimeFreqs = [1046.5, 1174.66, 1318.51, 1567.98, 1760.0];
+        const burstCount = Math.floor(Math.random() * 3) + 2;
+        for (let j = 0; j < burstCount; j++) {
+          const f = chimeFreqs[Math.floor(Math.random() * chimeFreqs.length)];
+          setTimeout(() => playWindChime(f), j * 160);
+        }
+      }
+    }, 5500);
 
     return () => {
       if (chordTimerRef.current) clearInterval(chordTimerRef.current);
+      if (chimesTimerRef.current) clearInterval(chimesTimerRef.current);
     };
   }, [isPlaying, currentStationIdx]);
 
-  // Volume
+  // Master volume sync
   useEffect(() => {
     if (masterGainRef.current && audioCtxRef.current) {
       masterGainRef.current.gain.setValueAtTime(volume, audioCtxRef.current.currentTime);
     }
   }, [volume]);
 
-  // Rain
+  // Multi-layer volume sync
   useEffect(() => {
     if (rainGainRef.current && audioCtxRef.current) {
-      rainGainRef.current.gain.setValueAtTime(rainEnabled ? 0.12 : 0, audioCtxRef.current.currentTime);
+      rainGainRef.current.gain.setValueAtTime(rainVol, audioCtxRef.current.currentTime);
     }
-  }, [rainEnabled]);
+  }, [rainVol]);
+
+  useEffect(() => {
+    if (chimesGainRef.current && audioCtxRef.current) {
+      chimesGainRef.current.gain.setValueAtTime(chimesVol, audioCtxRef.current.currentTime);
+    }
+  }, [chimesVol]);
+
+  useEffect(() => {
+    if (hearthGainRef.current && audioCtxRef.current) {
+      hearthGainRef.current.gain.setValueAtTime(hearthVol, audioCtxRef.current.currentTime);
+    }
+  }, [hearthVol]);
+
+  useEffect(() => {
+    if (cricketsGainRef.current && audioCtxRef.current) {
+      cricketsGainRef.current.gain.setValueAtTime(cricketsVol, audioCtxRef.current.currentTime);
+    }
+  }, [cricketsVol]);
+
+  // Sleep timer ticker
+  useEffect(() => {
+    if (sleepTimerSeconds === null) return;
+    if (sleepTimerSeconds <= 0) {
+      setIsPlaying(false);
+      setSleepTimerSeconds(null);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setSleepTimerSeconds((prev) => (prev !== null && prev > 0 ? prev - 1 : null));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [sleepTimerSeconds]);
 
   const togglePlay = () => {
     if (!isPlaying) {
@@ -265,8 +356,9 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 w-80 sm:w-96 rounded-2xl bg-[#06150fe6] border border-amber-400/50 p-4 sm:p-5 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-3 space-y-4">
-      {/* Top Header */}
+    <div className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-50 w-80 sm:w-[420px] rounded-2xl bg-[#03150deb] border border-amber-400/60 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-3 space-y-4 text-white">
+      
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-emerald-900/60 pb-3">
         <div className="flex items-center gap-2">
           <div className="p-2 rounded-xl bg-amber-400/10 border border-amber-400/40 text-amber-300">
@@ -274,9 +366,9 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
           </div>
           <div>
             <span className="font-cinzel text-[10px] font-bold text-amber-300 uppercase tracking-widest block">
-              Imperial Synthesized Chamber
+              Imperial Lo-Fi Studio
             </span>
-            <h3 className="font-cinzel text-sm font-bold text-white">OST & Piano Sanctuary</h3>
+            <h3 className="font-cinzel text-sm font-bold text-white">Palace Soundscape Chamber</h3>
           </div>
         </div>
 
@@ -288,17 +380,41 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
         </button>
       </div>
 
-      {/* Station Selector with 7 Piano Channels */}
-      <div className="space-y-1.5 max-h-56 overflow-y-auto scrollbar-thin pr-1">
-        <span className="text-[10px] uppercase font-mono text-emerald-500">
-          Select Piano Melodic Chamber ({STATIONS.length} Channels):
-        </span>
-        <div className="grid grid-cols-1 gap-1.5">
+      {/* Mode Tabs */}
+      <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+        <button
+          onClick={() => setActiveTab('stations')}
+          className={`py-1.5 rounded-xl border flex items-center justify-center gap-1.5 transition-all ${
+            activeTab === 'stations'
+              ? 'bg-amber-500/20 border-amber-400 text-amber-300 font-bold'
+              : 'bg-[#02100a] border-emerald-950 text-emerald-400/70 hover:text-white'
+          }`}
+        >
+          <Music className="w-3.5 h-3.5" />
+          <span>Melody Channels</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('mixer')}
+          className={`py-1.5 rounded-xl border flex items-center justify-center gap-1.5 transition-all ${
+            activeTab === 'mixer'
+              ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 font-bold'
+              : 'bg-[#02100a] border-emerald-950 text-emerald-400/70 hover:text-white'
+          }`}
+        >
+          <Sliders className="w-3.5 h-3.5" />
+          <span>Atmosphere Mixer</span>
+        </button>
+      </div>
+
+      {/* Tab 1: Stations */}
+      {activeTab === 'stations' && (
+        <div className="space-y-1.5 max-h-52 overflow-y-auto scrollbar-thin pr-1">
           {STATIONS.map((stn, idx) => (
             <button
               key={stn.id}
               onClick={() => setCurrentStationIdx(idx)}
-              className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between ${
+              className={`p-2.5 rounded-xl border text-left transition-all flex items-center justify-between w-full ${
                 currentStationIdx === idx
                   ? 'bg-amber-400/15 border-amber-400 text-amber-300 font-semibold shadow-md'
                   : 'bg-[#04120c] border-emerald-900/70 text-emerald-200 hover:border-emerald-600'
@@ -317,58 +433,123 @@ export const LoFiRadio: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ 
             </button>
           ))}
         </div>
-      </div>
+      )}
 
-      {/* Interactive Mini Piano Keys (Tap to play notes) */}
-      <div className="p-2 rounded-xl bg-[#030d08] border border-emerald-900/80 space-y-1">
-        <span className="text-[9px] uppercase font-mono text-emerald-500 block text-center">
-          Tap Keys to Play Along with the Chamber 🎹
-        </span>
-        <div className="flex justify-center gap-1">
-          {['C', 'D', 'E', 'F', 'G', 'A', 'B'].map((note, idx) => {
-            const freq = 261.63 * Math.pow(2, idx / 12 * 2);
-            return (
-              <button
-                key={note}
-                onClick={() => {
-                  initAudio();
-                  playPianoNote(freq, 2.5, 0);
-                }}
-                className="w-8 h-14 rounded-b-md bg-gradient-to-b from-white to-zinc-200 hover:from-amber-200 hover:to-amber-100 text-black text-[10px] font-bold pb-1 flex flex-col justify-end items-center shadow-inner active:scale-95 transition-all"
-              >
-                <span>{note}</span>
-              </button>
-            );
-          })}
+      {/* Tab 2: Atmosphere Mixer */}
+      {activeTab === 'mixer' && (
+        <div className="p-3 rounded-2xl bg-[#020e08] border border-emerald-900/80 space-y-3 text-xs font-mono">
+          <div>
+            <div className="flex justify-between text-emerald-300 mb-1">
+              <span>🌧️ Courtyard Summer Rain</span>
+              <span>{Math.round(rainVol * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={rainVol}
+              onChange={(e) => setRainVol(parseFloat(e.target.value))}
+              className="w-full accent-emerald-400 h-1 bg-emerald-950 rounded cursor-pointer"
+            />
+          </div>
+
+          <div>
+            <div className="flex justify-between text-amber-300 mb-1">
+              <span>🎐 Bamboo Wind Chimes</span>
+              <span>{Math.round(chimesVol * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={chimesVol}
+              onChange={(e) => setChimesVol(parseFloat(e.target.value))}
+              className="w-full accent-amber-400 h-1 bg-emerald-950 rounded cursor-pointer"
+            />
+          </div>
+
+          <div>
+            <div className="flex justify-between text-rose-300 mb-1">
+              <span>🪵 Crackling Hearth Fire</span>
+              <span>{Math.round(hearthVol * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={hearthVol}
+              onChange={(e) => setHearthVol(parseFloat(e.target.value))}
+              className="w-full accent-rose-400 h-1 bg-emerald-950 rounded cursor-pointer"
+            />
+          </div>
+
+          <div>
+            <div className="flex justify-between text-teal-300 mb-1">
+              <span>🦗 Night Palace Crickets</span>
+              <span>{Math.round(cricketsVol * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={cricketsVol}
+              onChange={(e) => setCricketsVol(parseFloat(e.target.value))}
+              className="w-full accent-teal-400 h-1 bg-emerald-950 rounded cursor-pointer"
+            />
+          </div>
         </div>
+      )}
+
+      {/* Sleep Timer Bar */}
+      <div className="p-2.5 rounded-xl bg-[#020e08] border border-emerald-900/60 flex items-center justify-between text-xs font-mono">
+        <div className="flex items-center gap-1.5 text-emerald-400">
+          <Moon className="w-3.5 h-3.5 text-amber-400" />
+          <span>Sleep Timer:</span>
+        </div>
+
+        <div className="flex items-center gap-1">
+          {[
+            { label: 'Off', val: null },
+            { label: '15m', val: 15 * 60 },
+            { label: '30m', val: 30 * 60 },
+            { label: '60m', val: 60 * 60 }
+          ].map((preset) => (
+            <button
+              key={preset.label}
+              onClick={() => setSleepTimerSeconds(preset.val)}
+              className={`px-2 py-0.5 rounded-md border text-[10px] transition-all ${
+                sleepTimerSeconds === preset.val || (preset.val === null && sleepTimerSeconds === null)
+                  ? 'bg-amber-400/20 border-amber-400 text-amber-300 font-bold'
+                  : 'bg-[#03150d] border-emerald-950 text-emerald-500'
+              }`}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+
+        {sleepTimerSeconds !== null && (
+          <span className="text-[10px] text-amber-300 font-bold">
+            {Math.floor(sleepTimerSeconds / 60)}:{(sleepTimerSeconds % 60).toString().padStart(2, '0')}
+          </span>
+        )}
       </div>
 
-      {/* Play Controls & Ambience Toggles */}
+      {/* Master Controls */}
       <div className="pt-2 border-t border-emerald-900/60 flex items-center justify-between gap-3">
         <button
           onClick={togglePlay}
           className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95"
         >
           {isPlaying ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
-          <span>{isPlaying ? 'Pause Melody' : 'Play Piano'}</span>
+          <span>{isPlaying ? 'Pause Studio' : 'Play Studio'}</span>
         </button>
 
-        {/* Rain Toggle */}
-        <button
-          onClick={() => setRainEnabled(!rainEnabled)}
-          className={`p-2 rounded-xl border transition-colors flex items-center gap-1 text-xs ${
-            rainEnabled
-              ? 'bg-emerald-950/80 border-emerald-500 text-emerald-300'
-              : 'bg-[#030e09] border-emerald-900 text-zinc-500'
-          }`}
-          title="Toggle soft rainfall sound"
-        >
-          <CloudRain className="w-3.5 h-3.5" />
-          <span className="text-[10px] hidden sm:inline">Rain</span>
-        </button>
-
-        {/* Volume Slider */}
-        <div className="flex items-center gap-1.5 flex-1 max-w-[90px]">
+        <div className="flex items-center gap-1.5 flex-1 max-w-[120px]">
           <Volume2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           <input
             type="range"

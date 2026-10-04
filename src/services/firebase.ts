@@ -211,3 +211,182 @@ export async function updateActiveArcadeSession(state: Partial<ArcadeCloudState>
     return false;
   }
 }
+
+// -------------------------------------------------------------
+// WATCH PARTY & REAL-TIME VIDEO PLAYHEAD SYNCHRONIZATION
+// -------------------------------------------------------------
+export interface DanmakuReaction {
+  id: string;
+  sender: string;
+  icon: string;
+  text?: string;
+  color: string;
+  timestamp: number;
+}
+
+export interface WatchPartySession {
+  animeMalId: number;
+  animeTitle: string;
+  episode: number;
+  currentTime: number;
+  isPlaying: boolean;
+  lastUpdated: number;
+  updatedBy: 'chif3n' | 'leslye';
+  danmaku?: DanmakuReaction[];
+}
+
+export function subscribeToWatchPartySession(onUpdate: (session: WatchPartySession) => void): () => void {
+  try {
+    const docRef = doc(db, 'watchParty', 'globalSession');
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as WatchPartySession;
+          if (data && data.animeMalId) {
+            onUpdate(data);
+          }
+        }
+      },
+      (error) => {
+        console.warn('[Firestore] watchParty subscription warning:', error);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('[Firestore] Error initializing watchParty listener:', err);
+    return () => {};
+  }
+}
+
+export async function updateWatchPartySession(patch: Partial<WatchPartySession>): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'watchParty', 'globalSession');
+    await setDoc(docRef, {
+      ...patch,
+      lastUpdated: Date.now()
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[Firestore] Failed to update watchParty session:', err);
+    return false;
+  }
+}
+
+export async function broadcastDanmaku(danmakuItem: DanmakuReaction): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'watchParty', 'globalSession');
+    await setDoc(docRef, {
+      lastDanmaku: danmakuItem,
+      lastUpdated: Date.now()
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[Firestore] Failed to broadcast danmaku:', err);
+    return false;
+  }
+}
+
+// -------------------------------------------------------------
+// IMPERIAL MOOD HERB STATUS
+// -------------------------------------------------------------
+export interface MoodHerbStatus {
+  moodId: string;
+  emoji: string;
+  label: string;
+  note?: string;
+  updatedBy: 'chif3n' | 'leslye';
+  lastUpdated: number;
+}
+
+export function subscribeToMoodHerbStatus(onUpdate: (status: MoodHerbStatus) => void): () => void {
+  try {
+    const docRef = doc(db, 'coupleStatus', 'moodPill');
+    const unsubscribe = onSnapshot(
+      docRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data() as MoodHerbStatus;
+          if (data && data.moodId) {
+            onUpdate(data);
+          }
+        }
+      },
+      (error) => {
+        console.warn('[Firestore] moodPill subscription warning:', error);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('[Firestore] Error initializing moodPill listener:', err);
+    return () => {};
+  }
+}
+
+export async function updateMoodHerbStatus(status: MoodHerbStatus): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'coupleStatus', 'moodPill');
+    await setDoc(docRef, {
+      ...status,
+      lastUpdated: Date.now()
+    });
+    return true;
+  } catch (err) {
+    console.error('[Firestore] Failed to update mood status:', err);
+    return false;
+  }
+}
+
+// -------------------------------------------------------------
+// TIME-LOCKED IMPERIAL VOICE & LOVE CAPSULES
+// -------------------------------------------------------------
+export interface TimeLockedCapsule {
+  id: string;
+  authorRole: 'chif3n' | 'leslye';
+  authorName: string;
+  title: string;
+  unlockTimestamp: number;
+  createdTimestamp: number;
+  messageType: 'text' | 'voice' | 'image';
+  content: string; // text decree, base64 voice note data url, or image data url
+  sealDesign: string; // 'imperial-gold' | 'jade-apothecary' | 'rose-demigod'
+  isOpened?: boolean;
+}
+
+export function subscribeToTimeLockedCapsules(onUpdate: (capsules: TimeLockedCapsule[]) => void): () => void {
+  try {
+    const q = query(collection(db, 'timeCapsules'), orderBy('createdTimestamp', 'desc'), limit(50));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list: TimeLockedCapsule[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as TimeLockedCapsule;
+          if (data && data.id) {
+            list.push(data);
+          }
+        });
+        onUpdate(list);
+      },
+      (error) => {
+        console.warn('[Firestore] timeCapsules subscription warning:', error);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    console.warn('[Firestore] Error initializing timeCapsules listener:', err);
+    return () => {};
+  }
+}
+
+export async function saveTimeLockedCapsule(capsule: TimeLockedCapsule): Promise<boolean> {
+  try {
+    const docRef = doc(db, 'timeCapsules', capsule.id);
+    await setDoc(docRef, capsule);
+    return true;
+  } catch (err) {
+    console.error('[Firestore] Failed to save time capsule:', err);
+    return false;
+  }
+}
+

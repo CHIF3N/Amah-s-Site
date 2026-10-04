@@ -27,7 +27,8 @@ import {
   Shuffle,
   Eye,
   Send,
-  Cloud
+  Cloud,
+  Skull
 } from 'lucide-react';
 import {
   subscribeToActiveArcadeSession,
@@ -41,6 +42,7 @@ interface ImperialCoupleGameProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenLoginModal?: () => void;
+  activeRole?: 'chif3n' | 'leslye';
 }
 
 // Telepathy Question Bank
@@ -207,16 +209,34 @@ const DEFAULT_CLOUD_STATE: ArcadeCloudState = {
 export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
   isOpen,
   onClose,
-  onOpenLoginModal
+  onOpenLoginModal,
+  activeRole
 }) => {
   // Active player role on this device
   const [myRole, setMyRole] = useState<'Chif3n' | 'Leslye'>(() => {
+    if (activeRole) {
+      return activeRole === 'leslye' ? 'Leslye' : 'Chif3n';
+    }
     try {
       const saved = localStorage.getItem('leslye_active_user');
       if (saved === 'leslye') return 'Leslye';
     } catch (e) {}
     return 'Chif3n';
   });
+
+  // Sync role if activeRole changes from parent
+  useEffect(() => {
+    if (activeRole) {
+      setMyRole(activeRole === 'leslye' ? 'Leslye' : 'Chif3n');
+    }
+  }, [activeRole]);
+
+  const handleSelectRole = (role: 'Chif3n' | 'Leslye') => {
+    setMyRole(role);
+    try {
+      localStorage.setItem('leslye_active_user', role === 'Leslye' ? 'leslye' : 'chif3n');
+    } catch (e) {}
+  };
 
   const [passAndPlay, setPassAndPlay] = useState<boolean>(false);
   const [session, setSession] = useState<ArcadeCloudState>(DEFAULT_CLOUD_STATE);
@@ -322,6 +342,11 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
     } else if (gameId === 'trivia') {
       newBoardState.triviaAnswers = { Chif3n: null, Leslye: null };
       newBoardState.triviaRevealed = false;
+    } else if (gameId === 'poison-trial') {
+      newBoardState.cureFlaskIdx = null;
+      newBoardState.tastedFlaskIdx = null;
+      newBoardState.trialRevealed = false;
+      newBoardState.trialSuccess = null;
     }
 
     await dispatchStateUpdate({
@@ -611,6 +636,58 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
     });
   };
 
+  // --- 6. MAOMAO'S POISON OR REMEDY TRIAL ---
+  const handleSetRemedyFlask = async (flaskIdx: number) => {
+    await dispatchStateUpdate({
+      boardState: {
+        ...session.boardState,
+        cureFlaskIdx: flaskIdx,
+        tastedFlaskIdx: null,
+        trialRevealed: false,
+        trialSuccess: null
+      },
+      turn: session.turn === 'Chif3n' ? 'Leslye' : 'Chif3n',
+      lastMove: { player: myRole, action: 'Brewed 3 Imperial Flasks with 1 Secret Remedy', timestamp: Date.now() }
+    });
+    playSound(659, 'triangle', 0.2);
+  };
+
+  const handleTasteFlask = async (flaskIdx: number) => {
+    const isCure = flaskIdx === session.boardState.cureFlaskIdx;
+    let scores = { ...session.scores };
+    if (isCure) {
+      scores[myRole] += 1;
+      playSound(880, 'triangle', 0.4);
+    } else {
+      playSound(330, 'sawtooth', 0.3);
+    }
+
+    await dispatchStateUpdate({
+      boardState: {
+        ...session.boardState,
+        tastedFlaskIdx: flaskIdx,
+        trialRevealed: true,
+        trialSuccess: isCure
+      },
+      scores,
+      winner: isCure ? `${myRole} Deduced The Pure Remedy! 🌿` : `${myRole} Tested The Toxin (Immunity Triggered!) 🧪`
+    });
+  };
+
+  const nextTrialRound = async () => {
+    await dispatchStateUpdate({
+      boardState: {
+        ...session.boardState,
+        cureFlaskIdx: null,
+        tastedFlaskIdx: null,
+        trialRevealed: false,
+        trialSuccess: null
+      },
+      turn: session.turn === 'Chif3n' ? 'Leslye' : 'Chif3n',
+      winner: null
+    });
+  };
+
   if (!isOpen) return null;
 
   const currentTelepathy = TELEPATHY_PROMPTS[session.boardState.telepathyPromptIdx || 0];
@@ -636,9 +713,31 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
                   <span>Firestore Live Sync</span>
                 </span>
               </div>
-              <p className="text-[10px] font-mono text-emerald-400/80">
-                Playing as: <span className="font-bold text-amber-300">{myRole === 'Chif3n' ? 'Sir Chif3n 👑' : 'Lady Leslye 🌿'}</span>
-              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-[10px] font-mono text-emerald-400/80">Device:</span>
+                <button
+                  onClick={() => handleSelectRole('Chif3n')}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all ${
+                    myRole === 'Chif3n'
+                      ? 'bg-amber-500 text-black shadow-sm'
+                      : 'bg-[#04140e] text-amber-300/80 border border-amber-900/60 hover:text-white'
+                  }`}
+                  title="Play as Sir Chif3n on this device"
+                >
+                  👑 Sir Chif3n
+                </button>
+                <button
+                  onClick={() => handleSelectRole('Leslye')}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all ${
+                    myRole === 'Leslye'
+                      ? 'bg-emerald-500 text-black shadow-sm'
+                      : 'bg-[#04140e] text-emerald-300/80 border border-emerald-900/60 hover:text-white'
+                  }`}
+                  title="Play as Lady Leslye on this device"
+                >
+                  🌿 Lady Leslye
+                </button>
+              </div>
             </div>
           </div>
 
@@ -671,6 +770,7 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
             { id: 'tic-tac-toe', name: 'Tic-Tac-Toe', icon: Grid },
             { id: 'gomoku', name: 'Gomoku (8x8)', icon: Layers },
             { id: 'couples-telepathy', name: 'Couples Telepathy', icon: Heart },
+            { id: 'poison-trial', name: "Maomao's Poison Trial", icon: Skull },
             { id: 'potion-craft', name: 'Potion Craft Co-op', icon: FlaskConical },
             { id: 'trivia', name: 'Anime Trivia Duel', icon: Brain },
             { id: 'silhouette-duel', name: 'Silhouette Duel', icon: Eye }
@@ -1049,6 +1149,100 @@ export const ImperialCoupleGame: React.FC<ImperialCoupleGameProps> = ({
                   </button>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* GAME 7: MAOMAO'S POISON TASTING TRIAL */}
+          {session.gameId === 'poison-trial' && (
+            <div className="w-full max-w-lg space-y-5 text-center">
+              <div className="p-4 rounded-2xl bg-[#03150d] border border-emerald-800/80 shadow-lg">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400 block mb-1">
+                  Maomao's Food Testing Protocol
+                </span>
+                <h3 className="font-cinzel text-base sm:text-lg font-bold text-white">
+                  The Poison or Remedy Tasting Trial 🧪
+                </h3>
+                <p className="text-xs text-emerald-300/80 font-serif mt-1">
+                  One partner secretly designates the Pure Remedy. The other tests the flasks!
+                </p>
+              </div>
+
+              {/* Status Indicator */}
+              <div className="p-3 rounded-2xl bg-[#02110a] border border-emerald-500/40 text-xs font-mono text-emerald-200">
+                {session.boardState.cureFlaskIdx === null || session.boardState.cureFlaskIdx === undefined ? (
+                  <span>
+                    Waiting for <strong className="text-amber-300">{session.turn}</strong> to secretly brew the Remedy flask...
+                  </span>
+                ) : !session.boardState.trialRevealed ? (
+                  <span>
+                    Flasks are brewed! <strong className="text-emerald-300">{session.turn}</strong> must now choose a flask to taste!
+                  </span>
+                ) : (
+                  <span className="text-amber-300 font-bold">
+                    {session.boardState.trialSuccess ? '✨ Celestial Remedy Identified! Pure Euphoria!' : '🧪 Mild Rear Palace Toxin! Maomao\'s immunity activated!'}
+                  </span>
+                )}
+              </div>
+
+              {/* 3 Imperial Flasks */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { id: 0, label: 'Jade Flask I', color: 'from-emerald-950 to-teal-950', hint: 'Steamed ginseng & lotus' },
+                  { id: 1, label: 'Gold Flask II', color: 'from-amber-950 to-yellow-950', hint: 'Honeyed chrysanthemum' },
+                  { id: 2, label: 'Silver Flask III', color: 'from-slate-950 to-zinc-950', hint: 'Clear mountain dew' }
+                ].map((flask) => {
+                  const isCure = session.boardState.cureFlaskIdx === flask.id;
+                  const isTasted = session.boardState.tastedFlaskIdx === flask.id;
+                  const isRevealed = session.boardState.trialRevealed;
+
+                  let borderStyle = 'border-emerald-800/80';
+                  if (isRevealed) {
+                    if (isCure) borderStyle = 'border-emerald-400 ring-2 ring-emerald-400 bg-emerald-950/80';
+                    else if (isTasted) borderStyle = 'border-red-500 ring-2 ring-red-500 bg-red-950/80';
+                  } else if (session.boardState.cureFlaskIdx === flask.id && session.turn !== myRole) {
+                    borderStyle = 'border-amber-400/80 ring-1 ring-amber-400/50';
+                  }
+
+                  return (
+                    <button
+                      key={flask.id}
+                      disabled={isRevealed || (session.boardState.cureFlaskIdx !== null && session.boardState.cureFlaskIdx !== undefined && session.turn !== myRole && !passAndPlay)}
+                      onClick={() => {
+                        if (session.boardState.cureFlaskIdx === null || session.boardState.cureFlaskIdx === undefined) {
+                          if (session.turn === myRole || passAndPlay) {
+                            handleSetRemedyFlask(flask.id);
+                          }
+                        } else if (!isRevealed && (session.turn === myRole || passAndPlay)) {
+                          handleTasteFlask(flask.id);
+                        }
+                      }}
+                      className={`p-4 rounded-3xl bg-gradient-to-b ${flask.color} border ${borderStyle} transition-all transform hover:scale-105 active:scale-95 shadow-xl flex flex-col items-center gap-2`}
+                    >
+                      <span className="text-4xl">
+                        {isRevealed ? (isCure ? '🌿' : '🧪') : '🍶'}
+                      </span>
+                      <span className="font-cinzel text-xs font-bold text-white">{flask.label}</span>
+                      <span className="text-[10px] font-mono text-emerald-400/70">{flask.hint}</span>
+                      {session.boardState.cureFlaskIdx === flask.id && !isRevealed && (
+                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono">
+                          Secret Remedy
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {session.boardState.trialRevealed && (
+                <div className="pt-2">
+                  <button
+                    onClick={nextTrialRound}
+                    className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-cinzel font-bold text-xs shadow-lg active:scale-95"
+                  >
+                    Next Tasting Round →
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

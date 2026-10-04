@@ -25,5 +25,17 @@ service cloud.firestore {
       allow create, update: if isValidArcadeState(request.resource.data);
       allow delete: if false;
     }
+
+    match /watchParty/{docId} {
+      allow read, write: if true;
+    }
+
+    match /coupleStatus/{docId} {
+      allow read, write: if true;
+    }
+
+    match /timeCapsules/{capsuleId} {
+      allow read, write: if true;
+    }
   }
 }

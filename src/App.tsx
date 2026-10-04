@@ -23,7 +23,9 @@ import {
   Zap,
   Filter,
   Bell,
-  BellRing
+  BellRing,
+  Scroll,
+  Gamepad2
 } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
@@ -46,6 +48,10 @@ import { ImperialCoupleGame } from './components/ImperialCoupleGame';
 import { ImperialLoginModal, ImperialRole } from './components/ImperialLoginModal';
 import { WatchActivityChart } from './components/WatchActivityChart';
 import { AmbientCanvas } from './components/AmbientCanvas';
+import { ApothecaryDossierModal } from './components/ApothecaryDossierModal';
+import { ImperialScrapbookModal } from './components/ImperialScrapbookModal';
+import { OfflineIndicator } from './components/OfflineIndicator';
+import { PWAMobileFloatingBanner } from './components/PWAInstallButton';
 import { AnimeItem, DateNightItem, WatchHistoryItem, DailyWatchActivity } from './types/anime';
 import { CURATED_ANIME, DEMIGOD_SCROLLS, MAOMAO_STATEMENTS_FOR_LESLYE } from './data/curatedData';
 import { searchAnime, fetchRecentAnime, sortAnimeByRecent } from './services/jikanApi';
@@ -59,6 +65,9 @@ function playHerbalChime() {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
     // Harmonics: 587.33Hz (D5), 880Hz (A5), 1174.66Hz (D6)
     const freqs = [587.33, 880, 1174.66];
@@ -107,6 +116,8 @@ export default function App() {
   const [vaultOpen, setVaultOpen] = useState(false);
   const [gameModalOpen, setGameModalOpen] = useState(false);
   const [loginModalOpen, setLoginModalOpen] = useState(false);
+  const [dossierModalOpen, setDossierModalOpen] = useState(false);
+  const [scrapbookModalOpen, setScrapbookModalOpen] = useState(false);
   const [activeRole, setActiveRole] = useState<ImperialRole>(() => {
     try {
       const saved = localStorage.getItem('leslye_active_user');
@@ -114,6 +125,23 @@ export default function App() {
     } catch (e) {}
     return 'chif3n';
   });
+
+  const [dailyWidgetsOpen, setDailyWidgetsOpen] = useState(true);
+
+  // Listen for service worker notification click message
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      const handleServiceWorkerMessage = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'OPEN_SECRET_VAULT') {
+          setVaultOpen(true);
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      };
+    }
+  }, []);
 
   // Ambience mode
   const [ambientMode, setAmbientMode] = useState<'stars' | 'sakura' | 'off'>('stars');
@@ -144,26 +172,40 @@ export default function App() {
 
   // Request browser notification permission
   const handleToggleNotifications = async () => {
+    // Always play chime on user gesture
+    playHerbalChime();
+
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === 'granted') {
         setNotificationsEnabled(true);
-        showToast('🔔 Background alerts are active and running!');
+        showToast('🔔 Background alerts are active! Test chime dispatched.');
+        try {
+          new Notification('🌿 Imperial Alerts Active', {
+            body: 'You are now tuned in to real-time love scrolls & watch parties!',
+            icon: '/pwa-192x192.png'
+          });
+        } catch (e) {}
         return;
       }
       try {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
           setNotificationsEnabled(true);
-          showToast('🌿 Imperial Notifications Enabled! You will receive live alerts for new love scrolls.');
-          playHerbalChime();
+          showToast('🌿 Imperial Notifications Enabled! Test chime dispatched.');
+          try {
+            new Notification('🌿 Imperial Alerts Enabled', {
+              body: 'You will receive real-time chimes for love scrolls and watch parties!',
+              icon: '/pwa-192x192.png'
+            });
+          } catch (e) {}
         } else {
-          setToastMessage('Notification permission was not granted in your browser settings.');
+          setToastMessage('Browser notification permission not granted. Audio chimes will still play in-app!');
         }
       } catch (err) {
         console.warn(err);
       }
     } else {
-      setToastMessage('Web notifications are not supported in this browser.');
+      showToast('🔔 Audio chimes are active for in-app alerts!');
     }
   };
 
@@ -201,22 +243,42 @@ export default function App() {
             ? 'Sent an image 📷'
             : latest.text || 'Sent a love decree ✨';
 
-        // Case A: Tab is Minimized or in Background (document.hidden === true)
-        if (typeof document !== 'undefined' && document.hidden) {
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        const notifTitle = latest.senderRole === 'chif3n' ? '🌿 Message from Sir Chif3n' : '🌸 Message from Lady Leslye';
+        const notifOptions = {
+          body: preview,
+          icon: '/pwa-192x192.png',
+          badge: '/pwa-192x192.png',
+          vibrate: [200, 100, 200],
+          tag: 'love-scroll-notification',
+          data: { url: '/' }
+        };
+
+        const dispatchPushNotification = () => {
+          if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') return;
+
+          // Service Worker showNotification is the standard method for Android Chrome
+          if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+            navigator.serviceWorker.ready
+              .then((reg) => {
+                reg.showNotification(notifTitle, notifOptions);
+              })
+              .catch(() => {
+                try {
+                  new Notification(notifTitle, notifOptions);
+                } catch (e) {}
+              });
+          } else {
             try {
-              new Notification(
-                latest.senderRole === 'chif3n' ? '🌿 Message from Sir Chif3n' : '🌸 Message from Lady Leslye',
-                {
-                  body: preview,
-                  icon: '/favicon.ico',
-                  tag: 'love-scroll-notification'
-                }
-              );
+              new Notification(notifTitle, notifOptions);
             } catch (err) {
               console.warn('System Notification error:', err);
             }
           }
+        };
+
+        // Case A: Tab is Minimized or in Background (document.hidden === true)
+        if (typeof document !== 'undefined' && document.hidden) {
+          dispatchPushNotification();
         } else {
           // Case B: App is Active on Screen
           // 1. Play gentle herbal chime sound
@@ -549,6 +611,10 @@ export default function App() {
       {/* Ambient Canvas */}
       <AmbientCanvas enabled={ambientMode !== 'off'} mode={ambientMode} />
 
+      {/* Offline Indicator & Mobile PWA Installation Banner */}
+      <OfflineIndicator />
+      <PWAMobileFloatingBanner />
+
       {/* Floating Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-16 md:bottom-6 right-4 md:right-6 z-50 p-4 rounded-xl bg-[#061e14]/95 border border-emerald-500/50 shadow-2xl text-xs sm:text-sm text-emerald-100 backdrop-blur-md flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 max-w-md">
@@ -588,6 +654,7 @@ export default function App() {
         isOpen={gameModalOpen}
         onClose={() => setGameModalOpen(false)}
         onOpenLoginModal={() => setLoginModalOpen(true)}
+        activeRole={activeRole}
       />
 
       {/* Imperial Profile & Persona Login Modal */}
@@ -619,6 +686,8 @@ export default function App() {
         onOpenGame={() => setGameModalOpen(true)}
         onOpenChatVault={() => setVaultOpen(true)}
         onOpenLogin={() => setLoginModalOpen(true)}
+        onOpenDossier={() => setDossierModalOpen(true)}
+        onOpenScrapbook={() => setScrapbookModalOpen(true)}
         activeRole={activeRole}
         ambientMode={ambientMode}
         onToggleAmbient={handleToggleAmbient}
@@ -681,11 +750,12 @@ export default function App() {
             isDateNightSaved={dateNightItems.some((i) => i.malId === currentPlayingAnime?.mal_id)}
             onToggleDateNight={handleToggleDateNight}
             onMarkWatched={handleRecordHistory}
+            activeRole={activeRole}
           />
         )}
 
-        {/* Quick Navigation Pill Bar (Scrollable horizontally on mobile) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none snap-x border-b border-emerald-950 pb-3">
+        {/* 1. Primary Media Tabs Bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none snap-x border-b border-emerald-950 pb-2.5">
           <button
             onClick={() => setActiveTab('browse')}
             className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start border ${
@@ -694,14 +764,7 @@ export default function App() {
                 : 'bg-[#05170f] text-emerald-300/80 border-emerald-900/80 hover:text-white hover:border-emerald-700'
             }`}
           >
-            <span>🌿 Realm Home</span>
-          </button>
-
-          <button
-            onClick={() => setGameModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-400/50 hover:border-amber-300 text-amber-300 hover:text-white text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start shadow-sm"
-          >
-            <span>🎮 Couple Duel (IRL Online)</span>
+            <span>🌿 Anime Streams</span>
           </button>
 
           <button
@@ -713,59 +776,7 @@ export default function App() {
             }`}
           >
             <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>⚡ Airing Now</span>
-          </button>
-
-          <button
-            onClick={() => setScheduleModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-[#05170f] border border-emerald-900/80 text-emerald-300/80 hover:text-white hover:border-emerald-700 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start"
-          >
-            <Calendar className="w-3.5 h-3.5 text-amber-400" />
-            <span>📅 Broadcast Schedule</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('demigod-picks')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start border ${
-              activeTab === 'demigod-picks'
-                ? 'bg-gradient-to-r from-amber-500 to-yellow-600 text-black font-bold border-amber-300 shadow-md'
-                : 'bg-[#05170f] text-amber-400/90 border-amber-900/50 hover:text-white hover:border-amber-600'
-            }`}
-          >
-            <Crown className="w-3.5 h-3.5 text-amber-400" />
-            <span>👑 My Vault / Favorites</span>
-          </button>
-
-          <button
-            onClick={() => setGachaModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/10 to-rose-500/10 border border-amber-500/40 text-amber-300 hover:border-amber-400 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start"
-          >
-            <Dice5 className="w-3.5 h-3.5 text-amber-400" />
-            <span>🎲 Anime Gacha Altar</span>
-          </button>
-
-          <button
-            onClick={() => setVaultOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-950/80 via-pink-950/60 to-amber-950/70 border border-rose-500/50 hover:border-rose-400 text-rose-200 hover:text-white text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start shadow-sm active:scale-95"
-          >
-            <Heart className="w-3.5 h-3.5 fill-rose-400 text-rose-400 animate-pulse" />
-            <span>💌 Secret Vault (Private Chat)</span>
-          </button>
-
-          <button
-            onClick={() => setGameModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-rose-500/20 border border-amber-400/50 hover:border-amber-300 text-amber-300 hover:text-white text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start shadow-sm active:scale-95"
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>🎮 Palace Arcade (2-Player IRL)</span>
-          </button>
-
-          <button
-            onClick={() => setRadioModalOpen(true)}
-            className="px-3.5 py-2 rounded-xl bg-[#05170f] border border-emerald-900/80 text-emerald-300/80 hover:text-white hover:border-emerald-700 text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start"
-          >
-            <Radio className="w-3.5 h-3.5 text-emerald-400" />
-            <span>🎵 OST Lo-Fi Radio</span>
+            <span>⚡ Airing Today</span>
           </button>
 
           <button
@@ -787,31 +798,175 @@ export default function App() {
                 : 'bg-[#05170f] text-emerald-300/80 border-emerald-900/80 hover:text-white hover:border-emerald-700'
             }`}
           >
-            <span>📖 Imperial Tomes (Novels)</span>
+            <span>📖 Imperial Tomes</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('demigod-picks')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start border ${
+              activeTab === 'demigod-picks'
+                ? 'bg-gradient-to-r from-amber-500 to-yellow-600 text-black font-bold border-amber-300 shadow-md'
+                : 'bg-[#05170f] text-amber-400/90 border-amber-900/50 hover:text-white hover:border-amber-600'
+            }`}
+          >
+            <Crown className="w-3.5 h-3.5 text-amber-400" />
+            <span>👑 Demigod's Picks ❤️</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('date-night')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 snap-start border ${
+              activeTab === 'date-night'
+                ? 'bg-gradient-to-r from-rose-600 to-pink-600 text-white border-rose-400 shadow-md'
+                : 'bg-[#05170f] text-rose-300/80 border-rose-900/50 hover:text-white hover:border-rose-600'
+            }`}
+          >
+            <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400" />
+            <span>Date Night Watchlist ({dateNightItems.length})</span>
+          </button>
+        </div>
+
+        {/* 2. Grouped Palace Sanctuaries & Activities Hub (3 Clean Thematic Pavilions) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Pavilion 1: 🌸 Lore & Memory Capsules */}
+          <div className="p-3 rounded-2xl bg-[#03150d]/90 border border-emerald-900/80 space-y-2 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-cinzel text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <Scroll className="w-3.5 h-3.5 text-amber-400" />
+                <span>Lore & Memories</span>
+              </span>
+              <span className="text-[10px] font-mono text-emerald-500">Pavilion I</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 text-xs font-medium">
+              <button
+                onClick={() => setDossierModalOpen(true)}
+                className="py-1.5 px-2 rounded-xl bg-[#051d12] hover:bg-[#08291b] border border-amber-500/40 text-amber-300 hover:text-white text-[11px] truncate transition-colors text-center"
+                title="Apothecary Incident Dossier & Movie"
+              >
+                📜 Dossier
+              </button>
+              <button
+                onClick={() => setScrapbookModalOpen(true)}
+                className="py-1.5 px-2 rounded-xl bg-[#051d12] hover:bg-[#08291b] border border-emerald-500/40 text-emerald-300 hover:text-white text-[11px] truncate transition-colors text-center"
+                title="Bamboo Photo Scrapbook & Capsules"
+              >
+                📷 Scrapbook
+              </button>
+              <button
+                onClick={() => setPoetryDrawerOpen(true)}
+                className="py-1.5 px-2 rounded-xl bg-[#051d12] hover:bg-[#08291b] border border-rose-500/40 text-rose-300 hover:text-white text-[11px] truncate transition-colors text-center"
+                title="Sir Chif3n's Vows and Poems"
+              >
+                🪶 Poetry
+              </button>
+            </div>
+          </div>
+
+          {/* Pavilion 2: 🎮 Palace Arcade & Lo-Fi Studio */}
+          <div className="p-3 rounded-2xl bg-[#03150d]/90 border border-emerald-900/80 space-y-2 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-cinzel text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <Gamepad2 className="w-3.5 h-3.5 text-amber-400" />
+                <span>Palace Arcade & Sound</span>
+              </span>
+              <span className="text-[10px] font-mono text-amber-500">Pavilion II</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5 text-xs font-medium">
+              <button
+                onClick={() => setGameModalOpen(true)}
+                className="py-1.5 px-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-rose-500/20 hover:from-amber-500/30 border border-amber-400/50 text-amber-200 hover:text-white text-[11px] font-bold truncate transition-all text-center"
+                title="Play 2-Player Online Duel"
+              >
+                🎮 Duel (Online)
+              </button>
+              <button
+                onClick={() => setRadioModalOpen(true)}
+                className="py-1.5 px-2 rounded-xl bg-[#051d12] hover:bg-[#08291b] border border-emerald-500/40 text-emerald-300 hover:text-white text-[11px] truncate transition-colors text-center"
+                title="Lo-Fi Soundscape Studio"
+              >
+                📻 Lo-Fi Studio
+              </button>
+              <button
+                onClick={() => setGachaModalOpen(true)}
+                className="py-1.5 px-2 rounded-xl bg-[#051d12] hover:bg-[#08291b] border border-amber-500/40 text-amber-300 hover:text-white text-[11px] truncate transition-colors text-center"
+                title="Summon Anime Gacha Fate"
+              >
+                🎲 Gacha
+              </button>
+            </div>
+          </div>
+
+          {/* Pavilion 3: 💌 Secret Vault & Broadcast Schedule */}
+          <div className="p-3 rounded-2xl bg-[#03150d]/90 border border-emerald-900/80 space-y-2 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-cinzel text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400" />
+                <span>Secret Vault & Airings</span>
+              </span>
+              <span className="text-[10px] font-mono text-rose-500">Pavilion III</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 text-xs font-medium">
+              <button
+                onClick={() => setVaultOpen(true)}
+                className="py-1.5 px-2 rounded-xl bg-gradient-to-r from-rose-950/80 via-pink-950/60 to-amber-950/70 hover:from-rose-900 border border-rose-500/50 text-rose-200 hover:text-white text-[11px] font-bold truncate transition-all flex items-center justify-center gap-1"
+                title="Private Correspondence & Voice Notes"
+              >
+                <span>💌 Secret Vault</span>
+                {unreadScrollCount > 0 && (
+                  <span className="px-1 py-0.2 rounded-full bg-rose-500 text-white font-mono text-[9px]">
+                    {unreadScrollCount}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setScheduleModalOpen(true)}
+                className="py-1.5 px-2 rounded-xl bg-[#051d12] hover:bg-[#08291b] border border-emerald-500/40 text-emerald-300 hover:text-white text-[11px] truncate transition-colors text-center"
+                title="Broadcast Schedule"
+              >
+                📅 Schedule
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Tab 1: Anime Catalog (Browse & Airing) */}
         {(activeTab === 'browse' || activeTab === 'airing') && (
           <div className="space-y-6 animate-in fade-in">
-            {/* Top Widgets: Next Date Night Countdown & Daily Affirmation */}
+            {/* Collapsible Daily Decree & Cuddle Planning Section */}
             {!searchResults && !currentPlayingAnime && (
-              <div className="space-y-4">
-                <DateNightCountdownWidget
-                  firstItem={dateNightItems[0]}
-                  onPlayAnime={(id, title) => {
-                    const matched = animeCatalog.find((a) => a.mal_id === id) || ({
-                      mal_id: id,
-                      title,
-                      images: { jpg: { image_url: '' } }
-                    } as AnimeItem);
-                    handlePlayAnime(matched, 1);
-                  }}
-                  onExploreCatalog={() => window.scrollTo({ top: 400, behavior: 'smooth' })}
-                  onOpenDateNightTab={() => setActiveTab('date-night')}
-                />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-1">
+                  <span className="font-cinzel text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <Leaf className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Demigod's Daily Decree & Cuddle Planning</span>
+                  </span>
+                  <button
+                    onClick={() => setDailyWidgetsOpen(!dailyWidgetsOpen)}
+                    className="text-[11px] font-mono text-emerald-400 hover:text-white flex items-center gap-1 underline"
+                  >
+                    <span>{dailyWidgetsOpen ? 'Collapse Pavilion' : 'Expand Pavilion'}</span>
+                  </button>
+                </div>
 
-                <DailyApothecaryAffirmation />
+                {dailyWidgetsOpen && (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <DateNightCountdownWidget
+                      firstItem={dateNightItems[0]}
+                      onPlayAnime={(id, title) => {
+                        const matched = animeCatalog.find((a) => a.mal_id === id) || ({
+                          mal_id: id,
+                          title,
+                          images: { jpg: { image_url: '' } }
+                        } as AnimeItem);
+                        handlePlayAnime(matched, 1);
+                      }}
+                      onExploreCatalog={() => window.scrollTo({ top: 400, behavior: 'smooth' })}
+                      onOpenDateNightTab={() => setActiveTab('date-night')}
+                    />
+
+                    <DailyApothecaryAffirmation />
+                  </div>
+                )}
               </div>
             )}
 
@@ -1087,6 +1242,22 @@ export default function App() {
         onClose={() => setVaultOpen(false)}
         onOpenLoginModal={() => setLoginModalOpen(true)}
       />
+
+      {/* The Apothecary Incident Dossier (Season 2, Season 3 & Movie) */}
+      <ApothecaryDossierModal
+        isOpen={dossierModalOpen}
+        onClose={() => setDossierModalOpen(false)}
+      />
+
+      {/* Imperial Scrapbook & Time-Locked Capsules */}
+      <ImperialScrapbookModal
+        isOpen={scrapbookModalOpen}
+        onClose={() => setScrapbookModalOpen(false)}
+        activeRole={activeRole}
+      />
+
+      {/* PWA Offline Indicator Banner */}
+      <OfflineIndicator />
 
       {/* Floating Imperial Secret Vault Launcher Button (Bottom Right) */}
       {!vaultOpen && (
