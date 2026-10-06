@@ -36,6 +36,7 @@ export interface LiveLoveScroll {
   imageUrl?: string;
   caption?: string;
   reactions?: Record<string, string[]>;
+  readBy?: string[];
   timestamp: number;
 }
 
@@ -958,7 +959,7 @@ app.get('/api/scrolls', (req: Request, res: Response) => {
 });
 
 app.post('/api/scrolls', (req: Request, res: Response) => {
-  const { sender, senderRole, text, type, audioUrl, duration, imageUrl, caption, reactions } = req.body;
+  const { sender, senderRole, text, type, audioUrl, duration, imageUrl, caption, reactions, readBy } = req.body;
   const hasText = text && typeof text === 'string' && text.trim().length > 0;
   const hasAudio = !!audioUrl;
   const hasImage = !!imageUrl;
@@ -980,6 +981,7 @@ app.post('/api/scrolls', (req: Request, res: Response) => {
     imageUrl: imageUrl || undefined,
     caption: caption ? String(caption).trim() : undefined,
     reactions: reactions || {},
+    readBy: Array.isArray(readBy) && readBy.length > 0 ? readBy : [senderRole || 'chif3n'],
     timestamp: Date.now()
   };
 
@@ -996,6 +998,50 @@ app.post('/api/scrolls', (req: Request, res: Response) => {
     message: newScroll,
     serverTime: Date.now()
   });
+});
+
+app.post('/api/scrolls/:id/read', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { role } = req.body;
+  if (!role) {
+    return res.status(400).json({ success: false, message: 'Missing role' });
+  }
+
+  const msg = liveLoveScrolls.find(m => m.id === id);
+  if (msg) {
+    if (!msg.readBy) msg.readBy = [];
+    if (!msg.readBy.includes(role)) {
+      msg.readBy.push(role);
+      broadcastPayload({ type: 'mark_read', id: msg.id, role, readBy: msg.readBy });
+    }
+    return res.json({ success: true, readBy: msg.readBy });
+  }
+  res.status(404).json({ success: false, message: 'Scroll not found' });
+});
+
+app.post('/api/scrolls/mark-all-read', (req: Request, res: Response) => {
+  const { role, ids } = req.body;
+  if (!role) {
+    return res.status(400).json({ success: false, message: 'Missing role' });
+  }
+
+  const idSet = Array.isArray(ids) && ids.length > 0 ? new Set(ids) : null;
+  const updatedIds: string[] = [];
+
+  liveLoveScrolls.forEach(msg => {
+    if (!idSet || idSet.has(msg.id)) {
+      if (!msg.readBy) msg.readBy = [];
+      if (!msg.readBy.includes(role)) {
+        msg.readBy.push(role);
+        updatedIds.push(msg.id);
+      }
+    }
+  });
+
+  if (updatedIds.length > 0) {
+    broadcastPayload({ type: 'mark_all_read', ids: updatedIds, role });
+  }
+  res.json({ success: true, updatedCount: updatedIds.length });
 });
 
 app.delete('/api/scrolls/:id', (req: Request, res: Response) => {
@@ -1498,6 +1544,30 @@ async function startServer() {
               if (list.length === 0) delete msg.reactions[parsed.emoji];
             }
             broadcastPayload({ type: 'update_message_reactions', id: msg.id, reactions: msg.reactions });
+          }
+        } else if (parsed.type === 'mark_read' && parsed.id && parsed.role) {
+          const msg = liveLoveScrolls.find(m => m.id === parsed.id);
+          if (msg) {
+            if (!msg.readBy) msg.readBy = [];
+            if (!msg.readBy.includes(parsed.role)) {
+              msg.readBy.push(parsed.role);
+              broadcastPayload({ type: 'mark_read', id: msg.id, role: parsed.role, readBy: msg.readBy });
+            }
+          }
+        } else if (parsed.type === 'mark_all_read' && parsed.role) {
+          const idSet = Array.isArray(parsed.ids) && parsed.ids.length > 0 ? new Set(parsed.ids) : null;
+          const updatedIds: string[] = [];
+          liveLoveScrolls.forEach(msg => {
+            if (!idSet || idSet.has(msg.id)) {
+              if (!msg.readBy) msg.readBy = [];
+              if (!msg.readBy.includes(parsed.role)) {
+                msg.readBy.push(parsed.role);
+                updatedIds.push(msg.id);
+              }
+            }
+          });
+          if (updatedIds.length > 0) {
+            broadcastPayload({ type: 'mark_all_read', ids: updatedIds, role: parsed.role });
           }
         } else if (parsed.type === 'typing') {
           broadcastPayload({ type: 'typing', user: parsed.user, isTyping: !!parsed.isTyping });

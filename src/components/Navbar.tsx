@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   Sparkles,
   Heart,
@@ -13,19 +13,8 @@ import {
   Crown,
   Gamepad2,
   Bell,
-  BellRing,
-  Camera,
-  Scroll,
-  ChevronDown,
-  Settings,
-  Download,
-  Film,
-  Layers,
-  Sparkle,
-  Phone
+  BellRing
 } from 'lucide-react';
-import { MoodHerbPill } from './MoodHerbPill';
-import { PWAInstallButton } from './PWAInstallButton';
 
 interface NavbarProps {
   activeTab: 'browse' | 'airing' | 'manga' | 'novels' | 'demigod-picks' | 'date-night' | 'love-scrolls';
@@ -37,9 +26,6 @@ interface NavbarProps {
   onOpenGame?: () => void;
   onOpenLogin?: () => void;
   onOpenChatVault?: () => void;
-  onOpenCall?: () => void;
-  onOpenDossier?: () => void;
-  onOpenScrapbook?: () => void;
   activeRole?: 'chif3n' | 'leslye';
   ambientMode: 'stars' | 'sakura' | 'off';
   onToggleAmbient: () => void;
@@ -59,9 +45,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenGame,
   onOpenLogin,
   onOpenChatVault,
-  onOpenCall,
-  onOpenDossier,
-  onOpenScrapbook,
   activeRole = 'chif3n',
   ambientMode,
   onToggleAmbient,
@@ -71,29 +54,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleNotifications,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [activeDropdown, setActiveDropdown] = useState<'lore' | 'arcade' | 'settings' | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setActiveDropdown(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const toggleDropdown = (name: 'lore' | 'arcade' | 'settings') => {
-    setActiveDropdown((prev) => (prev === name ? null : name));
-  };
 
   return (
     <header className="sticky top-0 z-40 bg-[#040e0a]/95 backdrop-blur-md border-b border-emerald-900/60 px-3 sm:px-6 lg:px-8 py-2.5 transition-colors">
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         
-        {/* Brand Header */}
+        {/* Brand Header with Japanese Sub-label & Demigod's Sanctuary badge */}
         <div className="flex items-center gap-3">
           <a
             href="#"
@@ -125,341 +91,152 @@ export const Navbar: React.FC<NavbarProps> = ({
           </a>
         </div>
 
-        {/* Desktop Grouped Navigation Hub */}
-        <div ref={dropdownRef} className="hidden lg:flex items-center gap-2">
-          
-          {/* Primary Media Switcher */}
-          <div className="flex items-center bg-[#021008] p-1 rounded-2xl border border-emerald-900/70 text-xs font-medium">
+        {/* Desktop Quick Triggers & Navigation */}
+        <div className="hidden lg:flex items-center gap-2">
+          {/* Active Persona / Login Switcher */}
+          {onOpenLogin && (
             <button
-              onClick={() => onSelectTab('browse')}
-              className={`px-3 py-1 rounded-xl transition-all ${
-                activeTab === 'browse' || activeTab === 'airing'
-                  ? 'bg-emerald-600 text-white font-bold shadow'
-                  : 'text-emerald-300/80 hover:text-white'
+              onClick={onOpenLogin}
+              className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm active:scale-95 ${
+                activeRole === 'leslye'
+                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60 hover:border-emerald-400'
+                  : 'bg-amber-950/80 text-amber-300 border-amber-500/60 hover:border-amber-400'
               }`}
+              title="Imperial Profile & Persona Gate"
             >
-              🌿 Anime
+              {activeRole === 'leslye' ? (
+                <>
+                  <Leaf className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Lady Leslye 🌿</span>
+                </>
+              ) : (
+                <>
+                  <Crown className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Sir Chif3n 👑</span>
+                </>
+              )}
             </button>
+          )}
+
+          {/* Couple Game Trigger */}
+          {onOpenGame && (
             <button
-              onClick={() => onSelectTab('manga')}
-              className={`px-3 py-1 rounded-xl transition-all ${
-                activeTab === 'manga'
-                  ? 'bg-emerald-600 text-white font-bold shadow'
-                  : 'text-emerald-300/80 hover:text-white'
-              }`}
-            >
-              📜 Manga
-            </button>
-            <button
-              onClick={() => onSelectTab('novels')}
-              className={`px-3 py-1 rounded-xl transition-all ${
-                activeTab === 'novels'
-                  ? 'bg-emerald-600 text-white font-bold shadow'
-                  : 'text-emerald-300/80 hover:text-white'
-              }`}
-            >
-              📖 Novels
-            </button>
-            <button
-              onClick={() => onSelectTab('demigod-picks')}
-              className={`px-3 py-1 rounded-xl transition-all ${
-                activeTab === 'demigod-picks'
-                  ? 'bg-amber-500 text-black font-bold shadow'
-                  : 'text-amber-300/80 hover:text-white'
-              }`}
-            >
-              👑 Picks ❤️
-            </button>
-          </div>
-
-          {/* Group 1: 🌸 Pavilions & Lore Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => toggleDropdown('lore')}
-              className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
-                activeDropdown === 'lore'
-                  ? 'bg-emerald-950 border-emerald-400 text-white'
-                  : 'bg-[#04140e] border-emerald-900/80 hover:border-emerald-600 text-emerald-200'
-              }`}
-            >
-              <Scroll className="w-3.5 h-3.5 text-amber-400" />
-              <span>Pavilions & Lore</span>
-              <ChevronDown className={`w-3 h-3 text-emerald-400 transition-transform ${activeDropdown === 'lore' ? 'rotate-180' : ''}`} />
-            </button>
-
-            {activeDropdown === 'lore' && (
-              <div className="absolute top-full left-0 mt-1.5 w-64 bg-[#03150d] border border-emerald-500/50 rounded-2xl p-2 shadow-2xl space-y-1 z-50 animate-in fade-in slide-in-from-top-2">
-                {onOpenDossier && (
-                  <button
-                    onClick={() => {
-                      onOpenDossier();
-                      setActiveDropdown(null);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-emerald-950 text-xs font-medium text-emerald-200 hover:text-white flex items-center gap-2.5 transition-colors"
-                  >
-                    <Scroll className="w-4 h-4 text-amber-400 shrink-0" />
-                    <div>
-                      <div className="font-bold text-white">Incident Dossier</div>
-                      <div className="text-[10px] text-zinc-400">Season 3 & Movie Countdown</div>
-                    </div>
-                  </button>
-                )}
-
-                {onOpenScrapbook && (
-                  <button
-                    onClick={() => {
-                      onOpenScrapbook();
-                      setActiveDropdown(null);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-emerald-950 text-xs font-medium text-emerald-200 hover:text-white flex items-center gap-2.5 transition-colors"
-                  >
-                    <Camera className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <div>
-                      <div className="font-bold text-white">Bamboo Scrapbook</div>
-                      <div className="text-[10px] text-zinc-400">Photo Polaroid & Time Capsules</div>
-                    </div>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => {
-                    onOpenPoetry();
-                    setActiveDropdown(null);
-                  }}
-                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-emerald-950 text-xs font-medium text-rose-300 hover:text-white flex items-center gap-2.5 transition-colors"
-                >
-                  <Feather className="w-4 h-4 text-rose-400 shrink-0" />
-                  <div>
-                    <div className="font-bold text-white">Vows & Poetry</div>
-                    <div className="text-[10px] text-zinc-400">Sir Chif3n's sacred verses</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onOpenSchedule();
-                    setActiveDropdown(null);
-                  }}
-                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-emerald-950 text-xs font-medium text-emerald-200 hover:text-white flex items-center gap-2.5 transition-colors"
-                >
-                  <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
-                  <div>
-                    <div className="font-bold text-white">Broadcast Schedule</div>
-                    <div className="text-[10px] text-zinc-400">Weekly simulcast air times</div>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onOpenGacha();
-                    setActiveDropdown(null);
-                  }}
-                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-emerald-950 text-xs font-medium text-amber-300 hover:text-white flex items-center gap-2.5 transition-colors"
-                >
-                  <Dice5 className="w-4 h-4 text-amber-400 shrink-0" />
-                  <div>
-                    <div className="font-bold text-white">Gacha Altar</div>
-                    <div className="text-[10px] text-zinc-400">Summon tonight's anime fate</div>
-                  </div>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Group 2: 🎮 Arcade & Lo-Fi Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => toggleDropdown('arcade')}
-              className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm ${
-                activeDropdown === 'arcade'
-                  ? 'bg-amber-950 border-amber-400 text-white'
-                  : 'bg-[#04140e] border-emerald-900/80 hover:border-amber-500 text-amber-300'
-              }`}
+              onClick={onOpenGame}
+              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-400/50 hover:border-amber-300 text-xs text-amber-300 hover:text-white transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+              title="Play Real-Time Couple Game across different phones"
             >
               <Gamepad2 className="w-3.5 h-3.5 text-amber-400" />
-              <span>Arcade & Lo-Fi</span>
-              <ChevronDown className={`w-3 h-3 text-amber-400 transition-transform ${activeDropdown === 'arcade' ? 'rotate-180' : ''}`} />
+              <span>Couple Duel 🎮</span>
             </button>
+          )}
 
-            {activeDropdown === 'arcade' && (
-              <div className="absolute top-full left-0 mt-1.5 w-60 bg-[#03150d] border border-amber-500/50 rounded-2xl p-2 shadow-2xl space-y-1 z-50 animate-in fade-in slide-in-from-top-2">
-                {onOpenGame && (
-                  <button
-                    onClick={() => {
-                      onOpenGame();
-                      setActiveDropdown(null);
-                    }}
-                    className="w-full text-left px-3 py-2 rounded-xl hover:bg-amber-950/60 text-xs font-medium text-amber-200 hover:text-white flex items-center gap-2.5 transition-colors"
-                  >
-                    <Gamepad2 className="w-4 h-4 text-amber-400 shrink-0" />
-                    <div>
-                      <div className="font-bold text-white">Palace Arcade Duel</div>
-                      <div className="text-[10px] text-zinc-400">7 Real-Time Online Games</div>
-                    </div>
-                  </button>
-                )}
+          {/* Schedule Trigger */}
+          <button
+            onClick={onOpenSchedule}
+            className="px-3 py-1.5 rounded-xl bg-[#04140e] border border-emerald-800/80 hover:border-emerald-500 text-xs text-emerald-200 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
+          >
+            <Calendar className="w-3.5 h-3.5 text-amber-400" />
+            <span>Schedule</span>
+          </button>
 
-                <button
-                  onClick={() => {
-                    onOpenRadio();
-                    setActiveDropdown(null);
-                  }}
-                  className="w-full text-left px-3 py-2 rounded-xl hover:bg-emerald-950 text-xs font-medium text-emerald-200 hover:text-white flex items-center gap-2.5 transition-colors"
-                >
-                  <Radio className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <div>
-                    <div className="font-bold text-white">Lo-Fi Soundscape Studio</div>
-                    <div className="text-[10px] text-zinc-400">Rain, chimes & sleep timer</div>
-                  </div>
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Gacha Altar Trigger */}
+          <button
+            onClick={onOpenGacha}
+            className="px-3 py-1.5 rounded-xl bg-[#04140e] border border-amber-500/40 hover:border-amber-400 text-xs text-amber-300 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
+          >
+            <Dice5 className="w-3.5 h-3.5 text-amber-400" />
+            <span>Gacha</span>
+          </button>
 
-          {/* Group 3: 💌 Secret Vault & Mood Herb (High Priority Quick-Trigger) */}
-          <div className="flex items-center gap-1.5">
-            {onOpenCall && (
-              <button
-                onClick={onOpenCall}
-                className="px-3 py-1.5 rounded-xl border border-emerald-500/60 bg-gradient-to-r from-emerald-950/80 via-teal-950/70 to-emerald-900/60 hover:border-emerald-400 text-emerald-200 hover:text-white text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-                title={activeRole === 'chif3n' ? 'Call Lady Leslye' : 'Call Sir Chif3n'}
-              >
-                <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Call {activeRole === 'chif3n' ? 'Leslye 🌿' : 'Chif3n 👑'}</span>
-              </button>
-            )}
+          {/* Lo-Fi Piano & Radio Trigger */}
+          <button
+            onClick={onOpenRadio}
+            className="px-3 py-1.5 rounded-xl bg-[#04140e] border border-emerald-800/80 hover:border-emerald-500 text-xs text-emerald-200 hover:text-white transition-all flex items-center gap-1.5 shadow-sm"
+          >
+            <Radio className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Piano & Lo-Fi</span>
+          </button>
 
-            {onOpenChatVault && (
-              <button
-                onClick={onOpenChatVault}
-                className="relative px-3 py-1.5 rounded-xl border border-rose-500/50 bg-gradient-to-r from-rose-950/70 via-pink-950/50 to-amber-950/60 hover:border-rose-400 text-rose-200 hover:text-white text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-                title="Open The Imperial Secret Vault"
-              >
-                <Heart className="w-3.5 h-3.5 fill-rose-400 text-rose-400 animate-pulse" />
-                <span>Vault 💌</span>
-                {unreadMessagesCount > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold shadow-md animate-bounce">
-                    {unreadMessagesCount}
-                  </span>
-                )}
-              </button>
-            )}
+          {/* Vows & Poetry Modal Trigger */}
+          <button
+            onClick={onOpenPoetry}
+            className="px-3 py-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-medium transition-colors flex items-center gap-1.5"
+            title="Read Sir Chif3n's Vows and Poems"
+          >
+            <Feather className="w-3.5 h-3.5 text-rose-400" />
+            <span>Vows & Poetry</span>
+          </button>
 
-            <MoodHerbPill currentRole={activeRole} />
-          </div>
-
-          {/* Group 4: ⚙️ Palace Settings & Preferences Dropdown */}
-          <div className="relative">
+          {/* Web Notification Alert Toggle */}
+          {onToggleNotifications && (
             <button
-              onClick={() => toggleDropdown('settings')}
-              className={`p-2 rounded-xl border text-xs font-semibold flex items-center gap-1 transition-all shadow-sm ${
-                activeDropdown === 'settings'
-                  ? 'bg-emerald-950 border-emerald-400 text-white'
-                  : 'bg-[#04140e] border-emerald-900/80 hover:border-emerald-600 text-emerald-300'
+              onClick={onToggleNotifications}
+              className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95 ${
+                notificationsEnabled
+                  ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
+                  : 'bg-[#04140e] border-emerald-800/60 hover:border-amber-400 text-zinc-400 hover:text-amber-300'
               }`}
-              title="Palace Preferences & Settings"
+              title={notificationsEnabled ? 'Alerts Active (Receiving Chimes & Push Notifications)' : 'Click to Enable Background Alerts for New Messages'}
             >
-              <Settings className="w-4 h-4 text-emerald-400" />
-              <ChevronDown className={`w-3 h-3 text-emerald-400 transition-transform ${activeDropdown === 'settings' ? 'rotate-180' : ''}`} />
+              {notificationsEnabled ? (
+                <BellRing className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              ) : (
+                <Bell className="w-3.5 h-3.5 text-amber-400" />
+              )}
+              <span className="hidden xl:inline">
+                {notificationsEnabled ? 'Alerts Active' : 'Enable Alerts'}
+              </span>
             </button>
+          )}
 
-            {activeDropdown === 'settings' && (
-              <div className="absolute top-full right-0 mt-1.5 w-64 bg-[#03150d] border border-emerald-500/50 rounded-2xl p-2.5 shadow-2xl space-y-2 z-50 animate-in fade-in slide-in-from-top-2 text-xs font-mono">
-                
-                {/* Persona Switcher */}
-                {onOpenLogin && (
-                  <button
-                    onClick={() => {
-                      onOpenLogin();
-                      setActiveDropdown(null);
-                    }}
-                    className="w-full p-2 rounded-xl bg-[#020e08] border border-emerald-900 flex items-center justify-between text-left hover:border-emerald-500 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      {activeRole === 'leslye' ? <Leaf className="w-3.5 h-3.5 text-emerald-400" /> : <Crown className="w-3.5 h-3.5 text-amber-400" />}
-                      <span className="font-bold text-white">{activeRole === 'leslye' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑'}</span>
-                    </div>
-                    <span className="text-[10px] text-amber-300 underline">Switch</span>
-                  </button>
-                )}
-
-                {/* Notifications Alert Toggle */}
-                {onToggleNotifications && (
-                  <button
-                    onClick={onToggleNotifications}
-                    className={`w-full p-2 rounded-xl border flex items-center justify-between text-left transition-colors ${
-                      notificationsEnabled
-                        ? 'bg-emerald-950 border-emerald-500 text-emerald-200'
-                        : 'bg-[#020e08] border-emerald-900 text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      {notificationsEnabled ? <BellRing className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> : <Bell className="w-3.5 h-3.5 text-amber-400" />}
-                      <span>Background Alerts</span>
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-400">
-                      {notificationsEnabled ? 'Active' : 'Enable'}
-                    </span>
-                  </button>
-                )}
-
-                {/* Ambience Toggle */}
-                <button
-                  onClick={onToggleAmbient}
-                  className="w-full p-2 rounded-xl bg-[#020e08] border border-emerald-900 flex items-center justify-between text-left hover:border-emerald-500 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Ambience Canvas</span>
-                  </div>
-                  <span className="text-[10px] font-bold capitalize text-amber-300">
-                    {ambientMode}
-                  </span>
-                </button>
-
-                {/* Date Night Watchlist Link */}
-                <button
-                  onClick={() => {
-                    onSelectTab('date-night');
-                    setActiveDropdown(null);
-                  }}
-                  className="w-full p-2 rounded-xl bg-[#020e08] border border-emerald-900 flex items-center justify-between text-left hover:border-emerald-500 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Heart className="w-3.5 h-3.5 text-rose-400 fill-rose-400" />
-                    <span>Date Night Watchlist</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-amber-300">
-                    {dateNightCount} saved
-                  </span>
-                </button>
-
-                {/* In-App PWA Install Button */}
-                <div className="pt-1 border-t border-emerald-950">
-                  <PWAInstallButton />
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Mobile menu triggers */}
-        <div className="flex items-center gap-2 lg:hidden">
+          {/* Imperial Secret Vault (Chat) */}
           {onOpenChatVault && (
             <button
               onClick={onOpenChatVault}
-              className="p-2 rounded-xl bg-rose-500/20 border border-rose-400 text-rose-300 relative"
-              title="Open Secret Vault"
+              className="relative px-3 py-1.5 rounded-xl border border-rose-500/50 bg-gradient-to-r from-rose-950/70 via-pink-950/50 to-amber-950/60 hover:border-rose-400 text-rose-200 hover:text-white text-xs font-cinzel font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+              title="Open The Imperial Secret Vault (Passcode Protected Chat)"
             >
-              <Heart className="w-4 h-4 fill-rose-400" />
+              <Heart className="w-3.5 h-3.5 fill-rose-400 text-rose-400 animate-pulse" />
+              <span>Secret Vault 💌</span>
               {unreadMessagesCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[9px] font-bold flex items-center justify-center">
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold shadow-md animate-bounce">
                   {unreadMessagesCount}
                 </span>
               )}
             </button>
           )}
 
+          {/* Date Night Pill */}
+          <button
+            onClick={() => onSelectTab('date-night')}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition-colors ${
+              activeTab === 'date-night'
+                ? 'bg-rose-600 text-white border-rose-400'
+                : 'bg-[#03110b] text-rose-300 border-rose-900/60 hover:border-rose-500'
+            }`}
+          >
+            <Heart className={`w-3.5 h-3.5 ${dateNightCount > 0 ? 'fill-rose-400' : ''}`} />
+            <span>Date Night</span>
+            {dateNightCount > 0 && (
+              <span className="text-[10px] font-mono bg-rose-950 px-1.5 py-0.2 rounded text-amber-300">
+                {dateNightCount}
+              </span>
+            )}
+          </button>
+
+          {/* Ambience Switcher */}
+          <button
+            onClick={onToggleAmbient}
+            title={`Ambience effect: currently ${ambientMode}`}
+            className="p-1.5 rounded-xl border border-emerald-900/60 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-200 transition-colors flex items-center gap-1 text-xs"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span className="capitalize">{ambientMode}</span>
+          </button>
+        </div>
+
+        {/* Mobile menu triggers */}
+        <div className="flex items-center gap-2 lg:hidden">
           {onOpenGame && (
             <button
               onClick={onOpenGame}
@@ -471,6 +248,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           <button
+            onClick={onOpenRadio}
+            className="p-2 rounded-xl bg-[#04140e] border border-emerald-800 text-emerald-300"
+            title="Open Piano & Lo-Fi"
+          >
+            <Radio className="w-4 h-4 text-emerald-400" />
+          </button>
+
+          <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-xl text-emerald-300 hover:text-white bg-emerald-950/80 border border-emerald-900"
             aria-label="Toggle navigation menu"
@@ -480,49 +265,84 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Mobile Drawer (Cleanly Grouped Sections) */}
+      {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="lg:hidden pt-3 pb-2 border-t border-emerald-900/60 mt-2 space-y-3 animate-in fade-in slide-in-from-top-2 text-xs">
-          
-          {/* Section 1: Couple's Sanctum */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-rose-400 font-bold px-1">
-              💌 Couple's Sanctum
-            </span>
+        <div className="lg:hidden pt-3 pb-2 border-t border-emerald-900/60 mt-2 space-y-1.5 animate-in fade-in slide-in-from-top-2">
+          {onOpenChatVault && (
+            <button
+              onClick={() => {
+                onOpenChatVault();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-2.5 rounded-xl bg-gradient-to-r from-rose-950/80 via-pink-950/60 to-amber-950/70 border border-rose-500/50 text-xs font-bold text-rose-200 flex items-center justify-between shadow-sm"
+            >
+              <div className="flex items-center gap-2">
+                <Heart className="w-4 h-4 fill-rose-400 text-rose-400 animate-pulse" />
+                <span>💌 The Imperial Secret Vault (Private Chat)</span>
+              </div>
+              {unreadMessagesCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold shadow-md animate-bounce">
+                  {unreadMessagesCount} New
+                </span>
+              )}
+            </button>
+          )}
 
-            {onOpenCall && (
+          {onToggleNotifications && (
+            <button
+              onClick={() => {
+                onToggleNotifications();
+              }}
+              className={`w-full text-left px-3 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 transition-all ${
+                notificationsEnabled
+                  ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
+                  : 'bg-[#04140e] border-emerald-800/60 text-amber-300'
+              }`}
+            >
+              {notificationsEnabled ? (
+                <BellRing className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Bell className="w-4 h-4 text-amber-400" />
+              )}
+              <span>{notificationsEnabled ? '🔔 Background Alerts Active' : '🔔 Enable Background Alerts'}</span>
+            </button>
+          )}
+
+          {onOpenGame && (
+            <button
+              onClick={() => {
+                onOpenGame();
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-left px-3 py-2.5 rounded-xl bg-amber-500/20 border border-amber-400 text-xs font-bold text-amber-300 flex items-center gap-2"
+            >
+              <Gamepad2 className="w-4 h-4 text-amber-400" />
+              <span>🎮 Play Real-Time Couple Duel (IRL Online)</span>
+            </button>
+          )}
+
+          <div className="grid grid-cols-2 gap-2 pb-2">
+            {onOpenLogin && (
               <button
                 onClick={() => {
-                  onOpenCall();
+                  onOpenLogin();
                   setMobileMenuOpen(false);
                 }}
-                className="w-full text-left p-2.5 rounded-xl bg-gradient-to-r from-emerald-950 via-teal-950 to-emerald-900 border border-emerald-500/60 font-bold text-emerald-200 flex items-center justify-between shadow-sm active:scale-98 transition-all"
+                className={`col-span-2 p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between gap-2 shadow-sm ${
+                  activeRole === 'leslye'
+                    ? 'bg-emerald-950 border-emerald-500 text-emerald-200'
+                    : 'bg-amber-950 border-amber-500 text-amber-200'
+                }`}
               >
                 <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4 text-emerald-400" />
-                  <span>Sacred Call ({activeRole === 'chif3n' ? 'Call Lady Leslye 🌿' : 'Call Sir Chif3n 👑'})</span>
+                  {activeRole === 'leslye' ? (
+                    <Leaf className="w-4 h-4 text-emerald-400" />
+                  ) : (
+                    <Crown className="w-4 h-4 text-amber-400" />
+                  )}
+                  <span>Persona: {activeRole === 'leslye' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑'}</span>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-300">Live Voice & Video</span>
-              </button>
-            )}
-
-            {onOpenChatVault && (
-              <button
-                onClick={() => {
-                  onOpenChatVault();
-                  setMobileMenuOpen(false);
-                }}
-                className="w-full text-left p-2.5 rounded-xl bg-gradient-to-r from-rose-950/80 via-pink-950/60 to-amber-950/70 border border-rose-500/50 font-bold text-rose-200 flex items-center justify-between shadow-sm"
-              >
-                <div className="flex items-center gap-2">
-                  <Heart className="w-4 h-4 fill-rose-400 text-rose-400 animate-pulse" />
-                  <span>The Imperial Secret Vault (Chat & Voice)</span>
-                </div>
-                {unreadMessagesCount > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold shadow-md animate-bounce">
-                    {unreadMessagesCount}
-                  </span>
-                )}
+                <span className="text-[10px] text-amber-300 underline font-mono">Switch Profile</span>
               </button>
             )}
 
@@ -532,206 +352,136 @@ export const Navbar: React.FC<NavbarProps> = ({
                   onOpenGame();
                   setMobileMenuOpen(false);
                 }}
-                className="w-full text-left p-2.5 rounded-xl bg-amber-500/20 border border-amber-400 font-bold text-amber-300 flex items-center gap-2"
+                className="col-span-2 p-2.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-rose-500/20 border border-amber-400/50 text-xs text-amber-300 font-bold flex items-center justify-center gap-2 shadow-sm"
               >
                 <Gamepad2 className="w-4 h-4 text-amber-400" />
-                <span>Palace Arcade (2-Player Online Duel) 🎮</span>
-              </button>
-            )}
-          </div>
-
-          {/* Section 2: Pavilions & Lore */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-bold px-1">
-              🌸 Imperial Pavilions & Lore
-            </span>
-
-            <div className="grid grid-cols-2 gap-2">
-              {onOpenDossier && (
-                <button
-                  onClick={() => {
-                    onOpenDossier();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="p-2.5 rounded-xl bg-[#041910] border border-amber-500/40 text-amber-200 flex items-center gap-2"
-                >
-                  <Scroll className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Incident Dossier</span>
-                </button>
-              )}
-
-              {onOpenScrapbook && (
-                <button
-                  onClick={() => {
-                    onOpenScrapbook();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="p-2.5 rounded-xl bg-[#041910] border border-emerald-500/40 text-emerald-200 flex items-center gap-2"
-                >
-                  <Camera className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Scrapbook</span>
-                </button>
-              )}
-
-              <button
-                onClick={() => {
-                  onOpenPoetry();
-                  setMobileMenuOpen(false);
-                }}
-                className="p-2.5 rounded-xl bg-[#041910] border border-rose-500/40 text-rose-300 flex items-center gap-2"
-              >
-                <Feather className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>Vows & Poetry</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  onOpenRadio();
-                  setMobileMenuOpen(false);
-                }}
-                className="p-2.5 rounded-xl bg-[#041910] border border-emerald-800 text-emerald-200 flex items-center gap-2"
-              >
-                <Radio className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>Lo-Fi Studio</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  onOpenSchedule();
-                  setMobileMenuOpen(false);
-                }}
-                className="p-2.5 rounded-xl bg-[#041910] border border-emerald-800 text-emerald-200 flex items-center gap-2"
-              >
-                <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Schedule</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  onOpenGacha();
-                  setMobileMenuOpen(false);
-                }}
-                className="p-2.5 rounded-xl bg-[#041910] border border-amber-500/40 text-amber-300 flex items-center gap-2"
-              >
-                <Dice5 className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Gacha Altar</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Section 3: Media Archives Navigation */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold px-1">
-              📜 Imperial Archives
-            </span>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => {
-                  onSelectTab('browse');
-                  setMobileMenuOpen(false);
-                }}
-                className={`p-2 rounded-xl text-left ${
-                  activeTab === 'browse' ? 'bg-emerald-900/60 text-white font-bold' : 'bg-[#020e08] text-emerald-300/80'
-                }`}
-              >
-                🌿 Anime Realm
-              </button>
-
-              <button
-                onClick={() => {
-                  onSelectTab('manga');
-                  setMobileMenuOpen(false);
-                }}
-                className={`p-2 rounded-xl text-left ${
-                  activeTab === 'manga' ? 'bg-emerald-900/60 text-white font-bold' : 'bg-[#020e08] text-emerald-300/80'
-                }`}
-              >
-                📜 Manga Scrolls
-              </button>
-
-              <button
-                onClick={() => {
-                  onSelectTab('novels');
-                  setMobileMenuOpen(false);
-                }}
-                className={`p-2 rounded-xl text-left ${
-                  activeTab === 'novels' ? 'bg-emerald-900/60 text-white font-bold' : 'bg-[#020e08] text-emerald-300/80'
-                }`}
-              >
-                📖 Imperial Tomes
-              </button>
-
-              <button
-                onClick={() => {
-                  onSelectTab('demigod-picks');
-                  setMobileMenuOpen(false);
-                }}
-                className={`p-2 rounded-xl text-left ${
-                  activeTab === 'demigod-picks' ? 'bg-amber-500/20 border border-amber-400 text-amber-300 font-bold' : 'bg-[#020e08] text-amber-300/80'
-                }`}
-              >
-                👑 Demigod's Picks ❤️
-              </button>
-            </div>
-          </div>
-
-          {/* Section 4: Preferences, PWA & Profile */}
-          <div className="pt-2 border-t border-emerald-950 space-y-2">
-            {onOpenLogin && (
-              <button
-                onClick={() => {
-                  onOpenLogin();
-                  setMobileMenuOpen(false);
-                }}
-                className={`w-full p-2.5 rounded-xl border text-xs font-bold flex items-center justify-between shadow-sm ${
-                  activeRole === 'leslye'
-                    ? 'bg-emerald-950 border-emerald-500 text-emerald-200'
-                    : 'bg-amber-950 border-amber-500 text-amber-200'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  {activeRole === 'leslye' ? <Leaf className="w-4 h-4 text-emerald-400" /> : <Crown className="w-4 h-4 text-amber-400" />}
-                  <span>Persona: {activeRole === 'leslye' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑'}</span>
-                </div>
-                <span className="text-[10px] text-amber-300 underline font-mono">Switch Profile</span>
-              </button>
-            )}
-
-            {onToggleNotifications && (
-              <button
-                onClick={onToggleNotifications}
-                className={`w-full p-2.5 rounded-xl border text-xs font-mono font-bold flex items-center justify-between transition-all ${
-                  notificationsEnabled
-                    ? 'bg-emerald-950 border-emerald-500 text-emerald-300'
-                    : 'bg-[#04140e] border-amber-500/40 text-amber-300'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <BellRing className="w-4 h-4 text-emerald-400" />
-                  <span>Background Push Alerts</span>
-                </div>
-                <span className="text-[10px]">{notificationsEnabled ? 'Active' : 'Enable'}</span>
+                <span>Palace Arcade (2-Player IRL Duel) 🎮</span>
               </button>
             )}
 
             <button
               onClick={() => {
-                onSelectTab('date-night');
+                onOpenSchedule();
                 setMobileMenuOpen(false);
               }}
-              className="w-full p-2.5 rounded-xl bg-[#04140e] border border-rose-900/60 text-rose-300 flex items-center justify-between"
+              className="p-2.5 rounded-xl bg-[#061710] border border-emerald-800 text-xs text-emerald-200 flex items-center gap-2"
             >
-              <div className="flex items-center gap-2">
-                <Heart className="w-4 h-4 fill-rose-400" />
-                <span>Date Night Queue</span>
-              </div>
-              <span className="text-xs font-mono text-amber-300">{dateNightCount} saved</span>
+              <Calendar className="w-4 h-4 text-amber-400" />
+              <span>Broadcast Schedule</span>
             </button>
 
-            {/* PWA Install */}
-            <PWAInstallButton />
+            <button
+              onClick={() => {
+                onOpenGacha();
+                setMobileMenuOpen(false);
+              }}
+              className="p-2.5 rounded-xl bg-[#061710] border border-amber-500/40 text-xs text-amber-300 flex items-center gap-2"
+            >
+              <Dice5 className="w-4 h-4 text-amber-400" />
+              <span>Gacha Altar</span>
+            </button>
+
+            {onToggleNotifications && (
+              <button
+                onClick={() => {
+                  onToggleNotifications();
+                  setMobileMenuOpen(false);
+                }}
+                className={`col-span-2 p-2.5 rounded-xl border text-xs flex items-center justify-between transition-all ${
+                  notificationsEnabled
+                    ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
+                    : 'bg-[#061710] border-emerald-800 text-zinc-300 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {notificationsEnabled ? (
+                    <BellRing className="w-4 h-4 text-emerald-400 animate-pulse" />
+                  ) : (
+                    <Bell className="w-4 h-4 text-amber-400" />
+                  )}
+                  <span>{notificationsEnabled ? 'System Alerts: Enabled' : 'Enable System Alerts'}</span>
+                </div>
+                <span className="font-mono text-[10px] text-emerald-400">
+                  {notificationsEnabled ? 'Active 🔔' : 'Tap to Allow'}
+                </span>
+              </button>
+            )}
           </div>
+
+          <button
+            onClick={() => {
+              onSelectTab('browse');
+              setMobileMenuOpen(false);
+            }}
+            className={`w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm ${
+              activeTab === 'browse' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
+            }`}
+          >
+            🌿 Realm Home
+          </button>
+
+          <button
+            onClick={() => {
+              onSelectTab('manga');
+              setMobileMenuOpen(false);
+            }}
+            className={`w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm ${
+              activeTab === 'manga' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
+            }`}
+          >
+            📜 Manga Scrolls (5+ Complete Series)
+          </button>
+
+          <button
+            onClick={() => {
+              onSelectTab('novels');
+              setMobileMenuOpen(false);
+            }}
+            className={`w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm ${
+              activeTab === 'novels' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
+            }`}
+          >
+            📖 Imperial Tomes & Facebook Sagas (20 Novels)
+          </button>
+
+          <button
+            onClick={() => {
+              onSelectTab('demigod-picks');
+              setMobileMenuOpen(false);
+            }}
+            className={`w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm ${
+              activeTab === 'demigod-picks' ? 'bg-emerald-900/60 text-white font-medium' : 'text-emerald-300/80'
+            }`}
+          >
+            👑 Demigod's Picks ❤️
+          </button>
+
+          <button
+            onClick={() => {
+              onSelectTab('date-night');
+              setMobileMenuOpen(false);
+            }}
+            className={`w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm flex items-center justify-between ${
+              activeTab === 'date-night' ? 'bg-rose-900/60 text-white font-medium' : 'text-rose-300/80'
+            }`}
+          >
+            <span>Date Night Watchlist</span>
+            {dateNightCount > 0 && (
+              <span className="text-xs font-mono text-amber-300">
+                {dateNightCount} saved
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              onOpenPoetry();
+              setMobileMenuOpen(false);
+            }}
+            className="w-full text-left px-3 py-2 rounded-xl text-xs sm:text-sm text-amber-300 hover:text-white"
+          >
+            ✨ Demigod's Vows & Poetry
+          </button>
         </div>
       )}
     </header>

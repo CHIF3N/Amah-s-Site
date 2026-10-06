@@ -47,6 +47,10 @@
           "type": "object",
           "description": "Map of user reactions to this scroll"
         },
+        "readBy": {
+          "type": "array",
+          "description": "List of user roles that have opened and read this scroll (e.g. ['chif3n', 'leslye'])"
+        },
         "timestamp": {
           "type": "number",
           "description": "Unix timestamp in milliseconds"

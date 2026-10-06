@@ -4,6 +4,8 @@ import {
   pushLoveScrollToCloud,
   deleteLoveScrollFromCloud,
   reactToLoveScrollInCloud,
+  markLoveScrollReadInCloud,
+  markAllLoveScrollsReadInCloud,
   subscribeToWhisperNotes,
   pushWhisperNoteToCloud,
   deleteWhisperNoteFromCloud,
@@ -20,6 +22,7 @@ const SEEDED_SCROLLS: LiveMessage[] = [
     senderRole: 'chif3n',
     type: 'text',
     text: 'To my precious Maomao, Lady Leslye: Testing all your snacks for poison so you can watch peacefully ❤️',
+    readBy: ['chif3n', 'leslye'],
     timestamp: Date.now() - 1000 * 60 * 45
   },
   {
@@ -28,6 +31,7 @@ const SEEDED_SCROLLS: LiveMessage[] = [
     senderRole: 'leslye',
     type: 'text',
     text: 'Thank you Sir Chif3n! Tonight is officially cuddle night. The rear palace can wait! 🍵✨',
+    readBy: ['chif3n', 'leslye'],
     timestamp: Date.now() - 1000 * 60 * 30
   },
   {
@@ -36,6 +40,7 @@ const SEEDED_SCROLLS: LiveMessage[] = [
     senderRole: 'chif3n',
     type: 'text',
     text: 'Sacred Decree: You are adored beyond measure. Relax your shoulders and lean on me.',
+    readBy: ['chif3n', 'leslye'],
     timestamp: Date.now() - 1000 * 60 * 15
   }
 ];
@@ -93,13 +98,18 @@ export function useRealtimeLoveSync(activeRole: 'chif3n' | 'leslye') {
       for (const m of incoming) {
         const existing = map.get(m.id);
         if (!existing) {
-          map.set(m.id, m);
+          map.set(m.id, {
+            ...m,
+            readBy: Array.isArray(m.readBy) ? m.readBy : []
+          });
         } else {
-          // Merge reactions and updated fields
+          // Merge reactions, readBy, and updated fields
+          const mergedReadBy = Array.from(new Set([...(existing.readBy || []), ...(m.readBy || [])]));
           map.set(m.id, {
             ...existing,
             ...m,
-            reactions: { ...(existing.reactions || {}), ...(m.reactions || {}) }
+            reactions: { ...(existing.reactions || {}), ...(m.reactions || {}) },
+            readBy: mergedReadBy
           });
         }
       }
@@ -145,6 +155,24 @@ export function useRealtimeLoveSync(activeRole: 'chif3n' | 'leslye') {
           setWhispers((prev) => prev.filter((w) => w.id !== data.id));
         } else if (data.type === 'typing') {
           setPartnerTyping(data.typing);
+        } else if (data.type === 'mark_read' && data.id && data.role) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === data.id
+                ? { ...msg, readBy: Array.from(new Set([...(msg.readBy || []), data.role])) }
+                : msg
+            )
+          );
+        } else if (data.type === 'mark_all_read' && data.role) {
+          const idSet = Array.isArray(data.ids) && data.ids.length > 0 ? new Set(data.ids) : null;
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (!idSet || idSet.has(msg.id)) {
+                return { ...msg, readBy: Array.from(new Set([...(msg.readBy || []), data.role])) };
+              }
+              return msg;
+            })
+          );
         }
       };
     }
@@ -186,6 +214,24 @@ export function useRealtimeLoveSync(activeRole: 'chif3n' | 'leslye') {
               }
             } else if (data.type === 'delete_message' && data.id) {
               setMessages((prev) => prev.filter((m) => m.id !== data.id));
+            } else if (data.type === 'mark_read' && data.id && data.role) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === data.id
+                    ? { ...m, readBy: Array.from(new Set([...(m.readBy || []), data.role])) }
+                    : m
+                )
+              );
+            } else if (data.type === 'mark_all_read' && data.role) {
+              const idSet = Array.isArray(data.ids) && data.ids.length > 0 ? new Set(data.ids) : null;
+              setMessages((prev) =>
+                prev.map((msg) => {
+                  if (!idSet || idSet.has(msg.id)) {
+                    return { ...msg, readBy: Array.from(new Set([...(msg.readBy || []), data.role])) };
+                  }
+                  return msg;
+                })
+              );
             } else if (data.type === 'update_message_reactions' && data.id) {
               setMessages((prev) =>
                 prev.map((m) => (m.id === data.id ? { ...m, reactions: data.reactions } : m))
@@ -293,6 +339,7 @@ export function useRealtimeLoveSync(activeRole: 'chif3n' | 'leslye') {
         imageUrl: payload.imageUrl,
         caption: payload.caption?.trim() || undefined,
         reactions: {},
+        readBy: [activeRole],
         timestamp: Date.now()
       };
 
@@ -477,6 +524,61 @@ export function useRealtimeLoveSync(activeRole: 'chif3n' | 'leslye') {
     } catch (e) {}
   }, []);
 
+  // Mark all unread messages as read by readerRole in Firestore, WebSocket, and local state
+  const markAllAsRead = useCallback(
+    async (readerRole?: 'chif3n' | 'leslye') => {
+      const role = readerRole || activeRole;
+      setMessages((prev) => {
+        const unreadList = prev.filter((m) => !m.readBy || !m.readBy.includes(role));
+        if (unreadList.length === 0) return prev;
+
+        const unreadIds = unreadList.map((m) => m.id);
+
+        // 1. Update Firestore message documents with current user's role in the readBy array field
+        unreadIds.forEach((id) => {
+          markLoveScrollReadInCloud(id, role).catch(() => {});
+        });
+
+        // 2. Cross-tab BroadcastChannel
+        if (broadcastRef.current) {
+          broadcastRef.current.postMessage({ type: 'mark_all_read', ids: unreadIds, role });
+        }
+
+        // 3. WebSocket
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          socketRef.current.send(JSON.stringify({ type: 'mark_all_read', ids: unreadIds, role }));
+        }
+
+        // 4. REST fallback
+        fetch('/api/scrolls/mark-all-read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: unreadIds, role })
+        }).catch(() => {});
+
+        // 5. Update local state
+        const updated = prev.map((m) => {
+          if (!m.readBy || !m.readBy.includes(role)) {
+            return {
+              ...m,
+              readBy: Array.from(new Set([...(m.readBy || []), role]))
+            };
+          }
+          return m;
+        });
+
+        try {
+          localStorage.setItem('imperial_live_scrolls', JSON.stringify(updated.slice(-200)));
+        } catch (e) {}
+
+        return updated;
+      });
+
+      setUnreadCount(0);
+    },
+    [activeRole]
+  );
+
   const clearUnreadCount = useCallback(() => {
     setUnreadCount(0);
   }, []);
@@ -488,6 +590,7 @@ export function useRealtimeLoveSync(activeRole: 'chif3n' | 'leslye') {
     connectionStatus,
     unreadCount,
     clearUnreadCount,
+    markAllAsRead,
     sendMessage,
     deleteMessage,
     reactToMessage,

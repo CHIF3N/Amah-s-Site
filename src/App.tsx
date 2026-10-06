@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   Search,
   Sparkles,
@@ -143,17 +143,131 @@ export default function App() {
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Live chime and notification when new message arrives and vault is closed
-  const prevUnreadRef = useRef(0);
+  // System Notification state & Permission Request Function
+  const [notificationsActive, setNotificationsActive] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission === 'granted';
+    }
+    return false;
+  });
+
+  const requestNotificationPermission = useCallback(async (): Promise<boolean> => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setToastMessage('⚠️ System notifications are not supported in this browser.');
+      setTimeout(() => setToastMessage(null), 4000);
+      return false;
+    }
+
+    try {
+      if (Notification.permission === 'granted') {
+        setNotificationsActive(true);
+        setToastMessage('🔔 Background alerts are already enabled!');
+        setTimeout(() => setToastMessage(null), 3500);
+        return true;
+      }
+
+      if (Notification.permission === 'denied') {
+        setToastMessage('⚠️ Notifications are blocked in browser settings. Please unblock them to receive alerts.');
+        setTimeout(() => setToastMessage(null), 5000);
+        return false;
+      }
+
+      const permission = await Notification.requestPermission();
+      const isGranted = permission === 'granted';
+      setNotificationsActive(isGranted);
+
+      if (isGranted) {
+        setToastMessage('✨ Background love scroll alerts activated!');
+        setTimeout(() => setToastMessage(null), 4000);
+        try {
+          new Notification('Sanctuary Alerts Enabled 🌿', {
+            body: 'You will now receive system alerts when love scrolls arrive while the app is in the background.',
+            icon: '/favicon.ico',
+            silent: true
+          });
+        } catch (e) {}
+      } else {
+        setToastMessage('Notification permission was not granted.');
+        setTimeout(() => setToastMessage(null), 4000);
+      }
+      return isGranted;
+    } catch (err) {
+      console.warn('Error requesting notification permission:', err);
+      return false;
+    }
+  }, []);
+
+  // Message listener in App.tsx:
+  // Tracks new incoming love scrolls, specifically checking for messages not sent by the current user role,
+  // and triggers system-level alerts using the Notification API when the app is in the background.
+  const prevMessageIdsRef = useRef<Set<string>>(new Set(messages.map((m) => m.id)));
+  const isInitialLoadRef = useRef(true);
+
   useEffect(() => {
-    if (unreadCount > prevUnreadRef.current && !vaultOpen) {
-      playHerbalChime();
-      const partnerName = activeRole === 'chif3n' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑';
+    // Skip initial mount so we don't alert on past/seeded scrolls
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      prevMessageIdsRef.current = new Set(messages.map((m) => m.id));
+      return;
+    }
+
+    // Identify newly arrived messages
+    const incomingMessages = messages.filter((msg) => !prevMessageIdsRef.current.has(msg.id));
+    prevMessageIdsRef.current = new Set(messages.map((m) => m.id));
+
+    if (incomingMessages.length === 0) return;
+
+    // Specifically filter for new messages NOT sent by the current user role
+    const partnerMessages = incomingMessages.filter((msg) => msg.senderRole !== activeRole);
+    if (partnerMessages.length === 0) return;
+
+    // Play celestial chime for partner scroll
+    playHerbalChime();
+
+    // Check if the app is currently in the background
+    const isAppInBackground =
+      typeof document !== 'undefined' &&
+      (document.hidden || document.visibilityState === 'hidden' || !document.hasFocus());
+
+    const partnerName = activeRole === 'chif3n' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑';
+
+    // When the app is in the background, trigger system-level Notification API alert!
+    if (isAppInBackground) {
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        partnerMessages.forEach((msg) => {
+          let previewText = 'Inscribed a new love decree 💌';
+          if (msg.text) {
+            previewText = msg.text.length > 100 ? `${msg.text.slice(0, 97)}...` : msg.text;
+          } else if (msg.type === 'audio') {
+            previewText = 'Recorded a sacred voice potion 🎙️';
+          } else if (msg.type === 'image') {
+            previewText = msg.caption ? `Shared a photo potion: ${msg.caption}` : 'Shared an apothecary photo 📸';
+          }
+
+          try {
+            const systemAlert = new Notification(`💌 Love Scroll from ${partnerName}`, {
+              body: previewText,
+              icon: '/favicon.ico',
+              tag: `scroll-${msg.id}`
+            });
+
+            systemAlert.onclick = () => {
+              window.focus();
+              setVaultOpen(true);
+              clearUnreadCount();
+              systemAlert.close();
+            };
+          } catch (err) {
+            console.warn('[Notification API] Could not create system notification:', err);
+          }
+        });
+      }
+    } else if (!vaultOpen) {
+      // In foreground and vault is closed: show in-app toast notification
       setToastMessage(`💌 New Love Scroll from ${partnerName}!`);
       setTimeout(() => setToastMessage(null), 4500);
     }
-    prevUnreadRef.current = unreadCount;
-  }, [unreadCount, vaultOpen, activeRole]);
+  }, [messages, activeRole, vaultOpen, clearUnreadCount]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -559,6 +673,8 @@ export default function App() {
         onToggleAmbient={handleToggleAmbient}
         dateNightCount={dateNightItems.length}
         unreadMessagesCount={unreadCount}
+        notificationsEnabled={notificationsActive}
+        onToggleNotifications={requestNotificationPermission}
       />
 
       {/* Main Content Area */}

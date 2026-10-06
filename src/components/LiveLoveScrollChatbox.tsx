@@ -9,6 +9,7 @@ import {
   X,
   Clock,
   Radio,
+  Check,
   CheckCheck,
   Cloud,
   Trash2,
@@ -198,6 +199,10 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
         {messages.map((msg) => {
           const isMe = msg.senderRole === activeRole;
           const isChif3n = msg.senderRole === 'chif3n';
+          const otherRole = activeRole === 'chif3n' ? 'leslye' : 'chif3n';
+          const otherName = otherRole === 'leslye' ? 'Lady Leslye' : 'Sir Chif3n';
+          const isReadByOther = Boolean(msg.readBy && msg.readBy.includes(otherRole));
+          const isReadByMe = Boolean(msg.readBy && msg.readBy.includes(activeRole));
 
           return (
             <div
@@ -274,9 +279,26 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
                     })}
                   </div>
 
-                  <div className="flex items-center gap-1 text-[9px] text-emerald-400/60 font-mono shrink-0">
-                    <CheckCheck className="w-3 h-3 text-emerald-400" />
-                    <span>Live</span>
+                  {/* Read Status Checkmark Indicator */}
+                  <div className="flex items-center gap-1 text-[9px] font-mono shrink-0 select-none">
+                    {isMe ? (
+                      isReadByOther ? (
+                        <span className="flex items-center gap-1 text-emerald-400 font-semibold" title={`Read by ${otherName} in Vault`}>
+                          <CheckCheck className="w-3 h-3 text-emerald-400" />
+                          <span>Read</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-zinc-400" title="Delivered to sanctuary">
+                          <Check className="w-3 h-3 text-zinc-400" />
+                          <span>Sent</span>
+                        </span>
+                      )
+                    ) : (
+                      <span className="flex items-center gap-1 text-emerald-400/80" title="Read in Vault">
+                        <CheckCheck className="w-3 h-3 text-emerald-400" />
+                        <span>Read</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

@@ -7,6 +7,7 @@ import {
   addDoc,
   deleteDoc,
   updateDoc,
+  arrayUnion,
   onSnapshot,
   query,
   orderBy,
@@ -80,6 +81,7 @@ export interface FirebaseLoveScroll {
   imageUrl?: string;
   caption?: string;
   reactions?: Record<string, string[]>;
+  readBy?: string[];
   timestamp: number;
 }
 
@@ -128,6 +130,7 @@ export function subscribeToLoveScrolls(onUpdate: (messages: FirebaseLoveScroll[]
               imageUrl: data.imageUrl,
               caption: data.caption,
               reactions: data.reactions || {},
+              readBy: Array.isArray(data.readBy) ? data.readBy : [],
               timestamp: data.timestamp || Date.now()
             });
           }
@@ -165,6 +168,7 @@ export async function pushLoveScrollToCloud(scroll: FirebaseLoveScroll): Promise
     if (scroll.imageUrl) payload.imageUrl = scroll.imageUrl;
     if (scroll.caption) payload.caption = scroll.caption;
     if (scroll.reactions) payload.reactions = scroll.reactions;
+    if (scroll.readBy) payload.readBy = scroll.readBy;
 
     await setDoc(docRef, payload, { merge: true });
     return true;
@@ -172,6 +176,31 @@ export async function pushLoveScrollToCloud(scroll: FirebaseLoveScroll): Promise
     handleFirestoreError(err, OperationType.WRITE, docPath);
     return false;
   }
+}
+
+/**
+ * Update the Firestore message document with the current user's role in the readBy array field.
+ */
+export async function markLoveScrollReadInCloud(id: string, readerRole: string): Promise<boolean> {
+  const docPath = `loveScrolls/${id}`;
+  try {
+    const docRef = doc(db, 'loveScrolls', id);
+    await updateDoc(docRef, {
+      readBy: arrayUnion(readerRole)
+    });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, docPath);
+    return false;
+  }
+}
+
+/**
+ * Batch update multiple Firestore message documents with the current user's role in the readBy array field upon vault opening.
+ */
+export async function markAllLoveScrollsReadInCloud(ids: string[], readerRole: string): Promise<void> {
+  if (!ids || ids.length === 0) return;
+  await Promise.allSettled(ids.map((id) => markLoveScrollReadInCloud(id, readerRole)));
 }
 
 /**

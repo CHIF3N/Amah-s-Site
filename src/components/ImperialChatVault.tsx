@@ -8,6 +8,7 @@ import {
   Lock,
   ArrowLeft,
   Cloud,
+  Check,
   CheckCheck,
   Key,
   AlertCircle,
@@ -217,7 +218,8 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
     sendMessage,
     deleteMessage,
     reactToMessage,
-    sendTypingStatus
+    sendTypingStatus,
+    markAllAsRead
   } = useRealtimeLoveSync(activeRole);
 
   const [inputText, setInputText] = useState('');
@@ -255,6 +257,23 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
     }
   }, [isOpen, isUnlocked]);
 
+  // Mark all unread messages as read in Firestore upon vault opening
+  useEffect(() => {
+    if (isOpen && isUnlocked) {
+      markAllAsRead(activeRole);
+    }
+  }, [isOpen, isUnlocked, activeRole, markAllAsRead]);
+
+  // Keep newly received incoming messages marked as read while vault is open & unlocked
+  useEffect(() => {
+    if (isOpen && isUnlocked && messages.length > 0) {
+      const hasUnread = messages.some((m) => !m.readBy?.includes(activeRole));
+      if (hasUnread) {
+        markAllAsRead(activeRole);
+      }
+    }
+  }, [isOpen, isUnlocked, messages, activeRole, markAllAsRead]);
+
   // Auto-scroll to latest message
   useEffect(() => {
     if (isUnlocked) {
@@ -273,6 +292,8 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
       try {
         sessionStorage.setItem('realm_vault_unlocked', 'true');
       } catch (e) {}
+      // Update Firestore message documents with current user's role upon unlocking vault
+      markAllAsRead(activeRole);
     } else {
       setIsShaking(true);
       setPasscodeError('Invalid Seal. Only the Demigod holds the key. 🌿');
@@ -296,6 +317,9 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
       localStorage.setItem('leslye_game_role', role);
     } catch (e) {}
     if (onRoleChange) onRoleChange(role);
+    if (isOpen && isUnlocked) {
+      markAllAsRead(role);
+    }
   };
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -678,6 +702,10 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
         {messages.map((msg) => {
           const isMe = msg.senderRole === activeRole;
           const isChif3n = msg.senderRole === 'chif3n';
+          const otherRole = activeRole === 'chif3n' ? 'leslye' : 'chif3n';
+          const otherName = otherRole === 'leslye' ? 'Lady Leslye' : 'Sir Chif3n';
+          const isReadByOther = Boolean(msg.readBy && msg.readBy.includes(otherRole));
+          const isReadByMe = Boolean(msg.readBy && msg.readBy.includes(activeRole));
 
           return (
             <div
@@ -772,9 +800,35 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
                     })}
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-[10px] text-emerald-400/70 font-mono shrink-0">
-                    <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Live Synced</span>
+                  {/* Read Status Checkmark Indicator */}
+                  <div className="flex items-center gap-1 text-[10px] font-mono shrink-0 select-none">
+                    {isMe ? (
+                      isReadByOther ? (
+                        <span
+                          className="flex items-center gap-1 text-emerald-400 font-semibold"
+                          title={`Opened & Read by ${otherName} in the Vault`}
+                        >
+                          <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Read by {otherName.split(' ')[0]}</span>
+                        </span>
+                      ) : (
+                        <span
+                          className="flex items-center gap-1 text-zinc-400"
+                          title="Delivered to imperial sanctuary, awaiting vault opening"
+                        >
+                          <Check className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>Sent</span>
+                        </span>
+                      )
+                    ) : (
+                      <span
+                        className="flex items-center gap-1 text-emerald-400/90"
+                        title="Opened & Read in the Vault"
+                      >
+                        <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Read</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
