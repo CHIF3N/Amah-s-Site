@@ -26,6 +26,8 @@
     "react-dom": "^19.0.1",
     "react-pdf": "^11.0.0",
     "recharts": "^3.10.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
     "vite": "^8.3.0",
     "web-push": "^3.6.7",
     "ws": "^8.22.0"
@@ -39,8 +41,6 @@
     "@types/ws": "^8.18.2",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
-    "tailwindcss": "^4.3.3",
-    "tsx": "^4.21.0",
-    "typescript": "^7.0.2"
+    "tsx": "^4.21.0"
   }
 }
