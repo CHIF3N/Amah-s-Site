@@ -2,12 +2,63 @@ import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import path from 'path';
 import http from 'http';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { WebSocketServer, WebSocket } from 'ws';
 import { GoogleGenAI } from '@google/genai';
+import webpush from 'web-push';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// -------------------------------------------------------------
+// Web Push VAPID Configuration for Background Alerts
+// -------------------------------------------------------------
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BDKFr-e8i0mSl7h7HjRct4ZW9JU7ZsqVD1YW4LOlHrE_vJ9xcyZspkGAFiK9iZvAjsUbgxb7pSID1BaO_7Hg4tg';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || 'u-m5DPFdt4Hz0n34Y7aJITIDI0hYTKTw6-YyYlfMfnA';
+const VAPID_SUBJECT = 'mailto:chifensama01@gmail.com';
+
+try {
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+  console.log('[WebPush] VAPID details registered successfully');
+} catch (e) {
+  console.warn('[WebPush] VAPID initialization warning:', e);
+}
+
+interface StoredPushSubscription {
+  id: string;
+  role: 'chif3n' | 'leslye';
+  subscription: webpush.PushSubscription;
+  createdAt: number;
+}
+
+const PUSH_SUBS_FILE = path.resolve(__dirname, '.push_subscriptions.json');
+
+function loadPersistedPushSubscriptions(): StoredPushSubscription[] {
+  try {
+    if (fs.existsSync(PUSH_SUBS_FILE)) {
+      const content = fs.readFileSync(PUSH_SUBS_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        console.log(`[WebPush] Loaded ${parsed.length} persisted push subscription(s) from disk`);
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('[WebPush] Notice reading persisted push subscriptions:', e);
+  }
+  return [];
+}
+
+function persistPushSubscriptions() {
+  try {
+    fs.writeFileSync(PUSH_SUBS_FILE, JSON.stringify(pushSubscriptions, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn('[WebPush] Failed to persist push subscriptions:', e);
+  }
+}
+
+const pushSubscriptions: StoredPushSubscription[] = loadPersistedPushSubscriptions();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -958,6 +1009,129 @@ app.get('/api/scrolls', (req: Request, res: Response) => {
   });
 });
 
+// -------------------------------------------------------------
+// Web Push Notification Helper for Closed App Delivery
+// -------------------------------------------------------------
+async function sendBackgroundPushNotification(scroll: LiveLoveScroll, forcedTargetRole?: 'chif3n' | 'leslye') {
+  const recipientRole = forcedTargetRole || (scroll.senderRole === 'chif3n' ? 'leslye' : 'chif3n');
+  const senderTitle = scroll.senderRole === 'leslye' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑';
+
+  let preview = 'Inscribed a new love decree 💌';
+  if (scroll.text) {
+    preview = scroll.text.length > 80 ? `${scroll.text.slice(0, 77)}...` : scroll.text;
+  } else if (scroll.type === 'audio') {
+    preview = 'Sent a sacred voice note potion 🎙️';
+  } else if (scroll.type === 'image') {
+    preview = scroll.caption ? `Sent a photo: ${scroll.caption}` : 'Sent an apothecary photo potion 📸';
+  }
+
+  const payload = JSON.stringify({
+    title: `💌 Love Scroll from ${senderTitle}`,
+    body: preview,
+    icon: '/favicon.ico',
+    badge: '/favicon.ico',
+    tag: `scroll-${scroll.id}`,
+    url: '/?openVault=true',
+    data: { url: '/?openVault=true' }
+  });
+
+  // Target subscriptions matching recipientRole; fallback to all active if forcedTargetRole specified
+  let targets = pushSubscriptions.filter(s => s.role === recipientRole);
+  if (targets.length === 0 && forcedTargetRole && pushSubscriptions.length > 0) {
+    targets = [...pushSubscriptions];
+  }
+
+  let sentCount = 0;
+  const deadIndices: number[] = [];
+
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i];
+    try {
+      await webpush.sendNotification(target.subscription, payload, {
+        TTL: 60 * 60 * 24 // 24 hours
+      });
+      sentCount++;
+      console.log(`[WebPush] Successfully delivered push notification to ${target.role}`);
+    } catch (err: any) {
+      console.warn(`[WebPush] Push notification error for ${target.role}:`, err?.statusCode || err?.message);
+      if (err?.statusCode === 404 || err?.statusCode === 410) {
+        const idx = pushSubscriptions.indexOf(target);
+        if (idx !== -1) deadIndices.push(idx);
+      }
+    }
+  }
+
+  if (deadIndices.length > 0) {
+    deadIndices.sort((a, b) => b - a).forEach(idx => pushSubscriptions.splice(idx, 1));
+    persistPushSubscriptions();
+  }
+
+  return { sentCount, totalTargets: targets.length };
+}
+
+// -------------------------------------------------------------
+// Web Push Subscription Endpoints
+// -------------------------------------------------------------
+app.get('/sw.js', (req: Request, res: Response) => {
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.resolve(__dirname, 'public', 'sw.js'));
+});
+
+app.get('/api/push/vapid-public-key', (req: Request, res: Response) => {
+  res.json({ success: true, publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post('/api/push/subscribe', (req: Request, res: Response) => {
+  const { role, subscription } = req.body;
+  if (!role || !subscription || !subscription.endpoint) {
+    return res.status(400).json({ success: false, message: 'Invalid subscription payload' });
+  }
+
+  const existingIdx = pushSubscriptions.findIndex(s => s.subscription.endpoint === subscription.endpoint);
+  if (existingIdx !== -1) {
+    pushSubscriptions.splice(existingIdx, 1);
+  }
+
+  pushSubscriptions.push({
+    id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    role: role === 'leslye' ? 'leslye' : 'chif3n',
+    subscription,
+    createdAt: Date.now()
+  });
+
+  persistPushSubscriptions();
+  console.log(`[WebPush] Registered push subscription for ${role}. Total active: ${pushSubscriptions.length}`);
+  res.json({ success: true, count: pushSubscriptions.length });
+});
+
+app.post('/api/push/test', async (req: Request, res: Response) => {
+  const { role } = req.body;
+  const targetRole = role === 'leslye' ? 'leslye' : 'chif3n';
+  const senderTitle = targetRole === 'leslye' ? 'Sir Chif3n 👑' : 'Lady Leslye 🌿';
+
+  const testScroll: LiveLoveScroll = {
+    id: `test-${Date.now()}`,
+    sender: senderTitle,
+    senderRole: targetRole === 'leslye' ? 'chif3n' : 'leslye',
+    type: 'text',
+    text: 'Testing your snacks for poison... Demigod cuddles on demand ❤️ (Push alert while closed)',
+    timestamp: Date.now()
+  };
+
+  const result = await sendBackgroundPushNotification(testScroll, targetRole);
+  res.json({
+    success: result.sentCount > 0,
+    sentCount: result.sentCount,
+    totalTargets: result.totalTargets,
+    message: result.sentCount > 0
+      ? `Dispatched test push notification to ${result.sentCount} active subscription(s)! Close the tab to verify background delivery.`
+      : pushSubscriptions.length > 0
+        ? `Fallback push dispatched to ${pushSubscriptions.length} available device(s).`
+        : 'No devices have registered push subscriptions yet. Click "Enable Alerts" on this device first!'
+  });
+});
+
 app.post('/api/scrolls', (req: Request, res: Response) => {
   const { sender, senderRole, text, type, audioUrl, duration, imageUrl, caption, reactions, readBy } = req.body;
   const hasText = text && typeof text === 'string' && text.trim().length > 0;
@@ -992,6 +1166,11 @@ app.post('/api/scrolls', (req: Request, res: Response) => {
 
   // Broadcast to all active WebSocket clients in real time
   broadcastScroll(newScroll);
+
+  // Send background push notification to partner device (even if browser/app is closed)
+  sendBackgroundPushNotification(newScroll).catch(err => {
+    console.warn('[WebPush] Error dispatching push:', err);
+  });
 
   res.json({
     success: true,
@@ -1523,6 +1702,7 @@ async function startServer() {
             }
 
             broadcastScroll(newScroll);
+            sendBackgroundPushNotification(newScroll).catch(() => {});
           }
         } else if (parsed.type === 'delete_message' && parsed.id) {
           const idx = liveLoveScrolls.findIndex(m => m.id === parsed.id);

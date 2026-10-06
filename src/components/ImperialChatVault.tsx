@@ -29,6 +29,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { useRealtimeLoveSync, LiveMessage } from '../hooks/useRealtimeLoveSync';
+import { subscribeToPushNotifications, triggerSystemNotification } from '../services/notificationService';
 
 export type LiveLoveMessage = LiveMessage;
 
@@ -612,15 +613,14 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
           {/* Alert Permission Button */}
           <button
             onClick={async () => {
-              if (typeof window !== 'undefined' && 'Notification' in window) {
-                if (Notification.permission !== 'granted') {
-                  const perm = await Notification.requestPermission();
-                  if (perm === 'granted') {
-                    setNotificationsActive(true);
-                  }
-                } else {
-                  setNotificationsActive(true);
-                }
+              const res = await subscribeToPushNotifications(activeRole);
+              if (res.success) {
+                setNotificationsActive(true);
+                triggerSystemNotification(
+                  'Vault Alerts Active 🌿',
+                  'Closed-app and background notifications are active for Sir Chif3n & Lady Leslye.',
+                  'vault-active'
+                );
               }
             }}
             className={`px-2.5 py-1.5 rounded-xl border text-xs font-mono flex items-center gap-1.5 transition-colors ${
@@ -628,7 +628,7 @@ export const ImperialChatVault: React.FC<ImperialChatVaultProps> = ({
                 ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-300'
                 : 'bg-[#04140e] border-emerald-900 text-zinc-400 hover:text-amber-300'
             }`}
-            title="Enable Background Notifications"
+            title="Enable Background & Closed-App Push Notifications"
           >
             {notificationsActive ? (
               <BellRing className="w-3.5 h-3.5 text-emerald-400" />

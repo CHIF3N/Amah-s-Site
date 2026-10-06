@@ -56,6 +56,13 @@ import {
   removeDateNightItemFromCloud
 } from './services/firebase';
 import { useRealtimeLoveSync } from './hooks/useRealtimeLoveSync';
+import {
+  registerServiceWorker,
+  subscribeToPushNotifications,
+  triggerSystemNotification as sendSystemNotification,
+  sendTestBackgroundPush,
+  isPushSupported
+} from './services/notificationService';
 
 /**
  * Gentle herbal chime synthesizer using Web Audio API harmonics
@@ -65,6 +72,9 @@ function playHerbalChime() {
     const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
 
     // Harmonics: 587.33Hz (D5), 880Hz (A5), 1174.66Hz (D6)
     const freqs = [587.33, 880, 1174.66];
@@ -85,6 +95,12 @@ function playHerbalChime() {
       osc.start(startTime);
       osc.stop(startTime + duration);
     });
+
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate([150, 75, 150]);
+      } catch (e) {}
+    }
   } catch (e) {
     console.warn('Audio chime warning:', e);
   }
@@ -143,7 +159,7 @@ export default function App() {
   // Toast notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // System Notification state & Permission Request Function
+  // System Notification state & Reliable Trigger Functions
   const [notificationsActive, setNotificationsActive] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       return Notification.permission === 'granted';
@@ -151,55 +167,151 @@ export default function App() {
     return false;
   });
 
+  const [notificationPermissionState, setNotificationPermissionState] = useState<NotificationPermission>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission;
+    }
+    return 'default';
+  });
+
+  // Tab Title Flashing Alert for Background Notifications
+  const titleIntervalRef = useRef<any>(null);
+
+  // Countdown state for testing closed-app push alerts
+  const [closedAppPushCountdown, setClosedAppPushCountdown] = useState<number | null>(null);
+
+  // Helper to trigger system Notification reliably across modern browsers & Service Worker
+  const triggerSystemNotification = useCallback(
+    async (title: string, body: string, msgId: string) => {
+      return sendSystemNotification(title, body, msgId, () => {
+        window.focus();
+        setVaultOpen(true);
+        clearUnreadCount();
+      });
+    },
+    [clearUnreadCount]
+  );
+
+  // 1. Register Service Worker on mount & listen for notification clicks
+  useEffect(() => {
+    registerServiceWorker();
+
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      const handleSwMessage = (event: MessageEvent) => {
+        if (event.data && event.data.type === 'OPEN_VAULT') {
+          setVaultOpen(true);
+          clearUnreadCount();
+        }
+      };
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      };
+    }
+  }, [clearUnreadCount]);
+
+  // 2. Open vault if URL contains ?openVault=true (opened via closed-app notification click)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('openVault=true')) {
+      setVaultOpen(true);
+      clearUnreadCount();
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('openVault');
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      } catch (e) {}
+    }
+  }, [clearUnreadCount]);
+
+  // 3. Auto-sync push subscription if already granted when user role switches
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      subscribeToPushNotifications(activeRole).catch(() => {});
+    }
+  }, [activeRole]);
+
+  // Request notification permission & subscribe device to Web Push
   const requestNotificationPermission = useCallback(async (): Promise<boolean> => {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setToastMessage('⚠️ System notifications are not supported in this browser.');
-      setTimeout(() => setToastMessage(null), 4000);
-      return false;
+    const res = await subscribeToPushNotifications(activeRole);
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermissionState(Notification.permission);
+      setNotificationsActive(Notification.permission === 'granted');
     }
 
-    try {
-      if (Notification.permission === 'granted') {
-        setNotificationsActive(true);
-        setToastMessage('🔔 Background alerts are already enabled!');
-        setTimeout(() => setToastMessage(null), 3500);
-        return true;
-      }
+    if (res.success) {
+      setToastMessage(res.message);
+      setTimeout(() => setToastMessage(null), 5000);
+      playHerbalChime();
+      triggerSystemNotification(
+        'Sanctuary Push Alerts Activated 🌿',
+        'You will now receive notifications even when this app is closed or in the background!',
+        'welcome-test'
+      );
+      return true;
+    } else {
+      setToastMessage(res.message);
+      setTimeout(() => setToastMessage(null), 5000);
+      return false;
+    }
+  }, [activeRole, triggerSystemNotification]);
 
-      if (Notification.permission === 'denied') {
-        setToastMessage('⚠️ Notifications are blocked in browser settings. Please unblock them to receive alerts.');
-        setTimeout(() => setToastMessage(null), 5000);
-        return false;
-      }
+  // Quick instant test alert function
+  const handleSendTestNotification = useCallback(async () => {
+    const partnerRole = activeRole === 'chif3n' ? 'leslye' : 'chif3n';
+    const partnerName = partnerRole === 'leslye' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑';
 
-      const permission = await Notification.requestPermission();
-      const isGranted = permission === 'granted';
-      setNotificationsActive(isGranted);
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted') {
+      const granted = await requestNotificationPermission();
+      if (!granted) return;
+    }
 
-      if (isGranted) {
-        setToastMessage('✨ Background love scroll alerts activated!');
-        setTimeout(() => setToastMessage(null), 4000);
-        try {
-          new Notification('Sanctuary Alerts Enabled 🌿', {
-            body: 'You will now receive system alerts when love scrolls arrive while the app is in the background.',
-            icon: '/favicon.ico',
-            silent: true
-          });
-        } catch (e) {}
+    playHerbalChime();
+    triggerSystemNotification(
+      `💌 Love Scroll from ${partnerName}`,
+      'Testing your snacks for poison... Demigod cuddles on demand ❤️',
+      `test-${Date.now()}`
+    );
+    setToastMessage(`💌 Test alert dispatched as ${partnerName}!`);
+    setTimeout(() => setToastMessage(null), 4000);
+  }, [activeRole, requestNotificationPermission, triggerSystemNotification]);
+
+  // Test Web Push with 3-second countdown to verify delivery when app/tab is closed
+  const handleTestClosedAppNotification = useCallback(async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted') {
+      const granted = await requestNotificationPermission();
+      if (!granted) return;
+    } else {
+      // Ensure subscription is fresh
+      await subscribeToPushNotifications(activeRole);
+    }
+
+    setClosedAppPushCountdown(3);
+    setToastMessage('⏳ Minimize or close this window now! Sending push alert in 3s...');
+
+    let remaining = 3;
+    const interval = setInterval(async () => {
+      remaining -= 1;
+      if (remaining > 0) {
+        setClosedAppPushCountdown(remaining);
+        setToastMessage(`⏳ Minimize or close this tab now! Sending push in ${remaining}s...`);
       } else {
-        setToastMessage('Notification permission was not granted.');
-        setTimeout(() => setToastMessage(null), 4000);
+        clearInterval(interval);
+        setClosedAppPushCountdown(null);
+        setToastMessage('🚀 Web Push dispatched from server! Check your system notification tray.');
+        setTimeout(() => setToastMessage(null), 6000);
+
+        const pushRes = await sendTestBackgroundPush(activeRole);
+        if (!pushRes.success) {
+          setToastMessage(`Notice: ${pushRes.message}`);
+          setTimeout(() => setToastMessage(null), 5000);
+        }
       }
-      return isGranted;
-    } catch (err) {
-      console.warn('Error requesting notification permission:', err);
-      return false;
-    }
-  }, []);
+    }, 1000);
+  }, [activeRole, requestNotificationPermission]);
 
   // Message listener in App.tsx:
   // Tracks new incoming love scrolls, specifically checking for messages not sent by the current user role,
-  // and triggers system-level alerts using the Notification API when the app is in the background.
+  // and triggers system-level alerts using the Notification API when the app is in the background OR when vault is closed.
   const prevMessageIdsRef = useRef<Set<string>>(new Set(messages.map((m) => m.id)));
   const isInitialLoadRef = useRef(true);
 
@@ -221,53 +333,76 @@ export default function App() {
     const partnerMessages = incomingMessages.filter((msg) => msg.senderRole !== activeRole);
     if (partnerMessages.length === 0) return;
 
-    // Play celestial chime for partner scroll
+    // Play celestial chime & trigger haptic feedback
     playHerbalChime();
 
-    // Check if the app is currently in the background
+    // Check if the app is currently in the background or unfocused
     const isAppInBackground =
       typeof document !== 'undefined' &&
       (document.hidden || document.visibilityState === 'hidden' || !document.hasFocus());
 
     const partnerName = activeRole === 'chif3n' ? 'Lady Leslye 🌿' : 'Sir Chif3n 👑';
 
-    // When the app is in the background, trigger system-level Notification API alert!
-    if (isAppInBackground) {
-      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        partnerMessages.forEach((msg) => {
-          let previewText = 'Inscribed a new love decree 💌';
-          if (msg.text) {
-            previewText = msg.text.length > 100 ? `${msg.text.slice(0, 97)}...` : msg.text;
-          } else if (msg.type === 'audio') {
-            previewText = 'Recorded a sacred voice potion 🎙️';
-          } else if (msg.type === 'image') {
-            previewText = msg.caption ? `Shared a photo potion: ${msg.caption}` : 'Shared an apothecary photo 📸';
-          }
-
-          try {
-            const systemAlert = new Notification(`💌 Love Scroll from ${partnerName}`, {
-              body: previewText,
-              icon: '/favicon.ico',
-              tag: `scroll-${msg.id}`
-            });
-
-            systemAlert.onclick = () => {
-              window.focus();
-              setVaultOpen(true);
-              clearUnreadCount();
-              systemAlert.close();
-            };
-          } catch (err) {
-            console.warn('[Notification API] Could not create system notification:', err);
-          }
-        });
-      }
-    } else if (!vaultOpen) {
-      // In foreground and vault is closed: show in-app toast notification
-      setToastMessage(`💌 New Love Scroll from ${partnerName}!`);
-      setTimeout(() => setToastMessage(null), 4500);
+    // 1. Tab Title Flashing Alert (100% reliable across all browsers & tabs)
+    if (typeof document !== 'undefined' && (isAppInBackground || !vaultOpen)) {
+      clearInterval(titleIntervalRef.current);
+      let flashState = false;
+      const originalTitle = "Leslye's Realm · Demigod's Sanctuary 🌿";
+      titleIntervalRef.current = setInterval(() => {
+        if (document.hasFocus() && vaultOpen) {
+          clearInterval(titleIntervalRef.current);
+          document.title = originalTitle;
+          return;
+        }
+        document.title = flashState
+          ? `(1) 💌 New Scroll from ${partnerName.split(' ')[0]}!`
+          : originalTitle;
+        flashState = !flashState;
+      }, 1000);
     }
-  }, [messages, activeRole, vaultOpen, clearUnreadCount]);
+
+    // 2. Trigger System-level Notification API Alert!
+    // Trigger when app is in the background OR when the vault is closed (user is not reading vault)
+    if (isAppInBackground || !vaultOpen) {
+      partnerMessages.forEach((msg) => {
+        let previewText = 'Inscribed a new love decree 💌';
+        if (msg.text) {
+          previewText = msg.text.length > 100 ? `${msg.text.slice(0, 97)}...` : msg.text;
+        } else if (msg.type === 'audio') {
+          previewText = 'Recorded a sacred voice potion 🎙️';
+        } else if (msg.type === 'image') {
+          previewText = msg.caption ? `Shared a photo potion: ${msg.caption}` : 'Shared an apothecary photo 📸';
+        }
+
+        triggerSystemNotification(`💌 Love Scroll from ${partnerName}`, previewText, msg.id);
+      });
+    }
+
+    // 3. Always show in-app toast notification if vault is closed
+    if (!vaultOpen) {
+      const latestMsg = partnerMessages[partnerMessages.length - 1];
+      const previewText = latestMsg.text
+        ? latestMsg.text.length > 40
+          ? `${latestMsg.text.slice(0, 38)}...`
+          : latestMsg.text
+        : latestMsg.type === 'audio'
+        ? 'Voice note potion 🎙️'
+        : 'Photo decree potion 📸';
+
+      setToastMessage(`💌 ${partnerName}: "${previewText}"`);
+      setTimeout(() => setToastMessage(null), 5000);
+    }
+  }, [messages, activeRole, vaultOpen, triggerSystemNotification]);
+
+  // Clean up title interval when vault is opened
+  useEffect(() => {
+    if (vaultOpen) {
+      clearInterval(titleIntervalRef.current);
+      if (typeof document !== 'undefined') {
+        document.title = "Leslye's Realm · Demigod's Sanctuary 🌿";
+      }
+    }
+  }, [vaultOpen]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -596,9 +731,23 @@ export default function App() {
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-16 md:bottom-6 right-4 md:right-6 z-50 p-4 rounded-xl bg-[#061e14]/95 border border-emerald-500/50 shadow-2xl text-xs sm:text-sm text-emerald-100 backdrop-blur-md flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 max-w-md">
-          <Leaf className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span className="font-medium">{toastMessage}</span>
+        <div className="fixed bottom-16 md:bottom-6 right-4 md:right-6 z-50 p-3 sm:p-4 rounded-2xl bg-[#061e14]/95 border border-emerald-500/60 shadow-2xl text-xs sm:text-sm text-emerald-100 backdrop-blur-md flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-3 max-w-md">
+          <div className="flex items-center gap-2.5">
+            <Leaf className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="font-medium">{toastMessage}</span>
+          </div>
+          {toastMessage.includes('Scroll') && (
+            <button
+              onClick={() => {
+                setVaultOpen(true);
+                clearUnreadCount();
+                setToastMessage(null);
+              }}
+              className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-black font-bold text-xs shrink-0 hover:from-emerald-400 hover:to-teal-400 transition-all shadow-md active:scale-95"
+            >
+              Open Vault 💌
+            </button>
+          )}
         </div>
       )}
 
@@ -679,6 +828,99 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 space-y-6 relative z-20">
+        
+        {/* Prominent Notification Permission Banner when not yet granted */}
+        {typeof window !== 'undefined' && 'Notification' in window && notificationPermissionState === 'default' && (
+          <div className="rounded-2xl bg-gradient-to-r from-emerald-950/90 via-[#062417]/95 to-amber-950/80 border border-emerald-500/60 p-3.5 sm:p-4 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 shrink-0">
+                <BellRing className="w-5 h-5 text-emerald-400 animate-pulse" />
+              </div>
+              <div>
+                <p className="text-xs sm:text-sm font-semibold text-white">
+                  Enable Live Alerts for Sir Chif3n & Lady Leslye 💌
+                </p>
+                <p className="text-[11px] text-emerald-200/80 mt-0.5">
+                  Get instant system notifications even when this app is closed or in the background.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+              <button
+                onClick={requestNotificationPermission}
+                className="flex-1 sm:flex-none px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-black font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <Bell className="w-3.5 h-3.5" />
+                <span>Allow Notifications</span>
+              </button>
+              <button
+                onClick={handleSendTestNotification}
+                className="px-3 py-2 rounded-xl bg-[#03140c] hover:bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-mono transition-all"
+                title="Test instant notification alert"
+              >
+                Test Alert 🔔
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Closed-App Web Push Active Status Banner with 3s verification test */}
+        {typeof window !== 'undefined' && 'Notification' in window && notificationsActive && (
+          <div className="rounded-2xl bg-[#051c12]/90 border border-emerald-600/40 p-3 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in text-xs">
+            <div className="flex items-center gap-2.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+              <div>
+                <span className="font-semibold text-emerald-200">
+                  Closed-App Web Push Alerts Active 💌
+                </span>
+                <span className="text-emerald-400/80 ml-1.5 hidden md:inline">
+                  — You will receive system notifications even when this tab or browser is closed.
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+              <button
+                onClick={handleTestClosedAppNotification}
+                disabled={closedAppPushCountdown !== null}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow transition-all flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+                title="Triggers a 3-second countdown test so you can close this window and verify push delivery"
+              >
+                <BellRing className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                <span>
+                  {closedAppPushCountdown !== null
+                    ? `Close/minimize tab now! (${closedAppPushCountdown}s)`
+                    : 'Test Closed-App Push (3s timer) 🚀'}
+                </span>
+              </button>
+              <button
+                onClick={handleSendTestNotification}
+                className="px-2.5 py-1.5 rounded-xl bg-[#03140c] hover:bg-emerald-950 text-emerald-300 border border-emerald-800 text-xs font-mono transition-all"
+                title="Instant local notification test"
+              >
+                Instant 🔔
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Warning if notifications blocked in browser settings */}
+        {typeof window !== 'undefined' && 'Notification' in window && notificationPermissionState === 'denied' && (
+          <div className="rounded-2xl bg-amber-950/40 border border-amber-600/40 p-3 text-xs text-amber-200 flex items-center justify-between gap-3">
+            <span>
+              ⚠️ Notifications are blocked in your browser settings. To receive alerts when closed, click the lock icon in the address bar and select "Allow notifications".
+            </span>
+            <button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.alert('To allow notifications:\n1. Click the lock/site settings icon in your browser address bar.\n2. Set "Notifications" to "Allow".\n3. Reload the page.');
+                }
+              }}
+              className="px-2.5 py-1 rounded-xl bg-amber-900/60 border border-amber-500/40 text-amber-200 shrink-0 font-mono hover:bg-amber-800/80"
+            >
+              How to enable
+            </button>
+          </div>
+        )}
         
         {/* Stream Player Section (Immediate Viewport Rollout) */}
         {currentPlayingAnime && (

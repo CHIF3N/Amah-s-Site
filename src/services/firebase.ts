@@ -492,3 +492,27 @@ export async function updateActiveArcadeSession(state: Partial<ArcadeCloudState>
   }
 }
 
+/**
+ * Persist Web Push subscription to Firestore for multi-device background delivery
+ */
+export async function savePushSubscriptionToCloud(
+  role: 'chif3n' | 'leslye',
+  subscription: any
+): Promise<boolean> {
+  const docId = `sub_${role}_${btoa(subscription.endpoint || '').slice(-16).replace(/[/+=]/g, '')}`;
+  const path = `pushSubscriptions/${docId}`;
+  try {
+    const docRef = doc(db, 'pushSubscriptions', docId);
+    await setDoc(docRef, {
+      id: docId,
+      role,
+      subscription,
+      updatedAt: Date.now()
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, path);
+    return false;
+  }
+}
+

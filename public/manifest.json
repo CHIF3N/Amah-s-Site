@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "Leslye's Realm - Anime Sanctuary",
+  "short_name": "LeslyeRealm",
+  "description": "A bespoke anime streaming sanctuary crafted with demigod devotion for Leslye by her boyfriend Sir Chif3n.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#040e0a",
+  "background_color": "#040e0a",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ]
+}
