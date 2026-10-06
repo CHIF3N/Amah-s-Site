@@ -5,8 +5,8 @@ import {
   doc,
   setDoc,
   addDoc,
+  deleteDoc,
   updateDoc,
-  arrayUnion,
   onSnapshot,
   query,
   orderBy,
@@ -22,6 +22,40 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 export const db = firebaseConfig.firestoreDatabaseId
   ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
   : getFirestore(app);
+
+// Error handling types and helper matching the Firebase integration skill
+export enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+export interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+  };
+}
+
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): FirestoreErrorInfo {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: null,
+      email: null,
+    },
+    operationType,
+    path
+  };
+  console.warn('Firestore Error: ', JSON.stringify(errInfo));
+  return errInfo;
+}
 
 // Validate connection on boot as mandated by the Firebase skill
 async function testConnection() {
@@ -45,17 +79,37 @@ export interface FirebaseLoveScroll {
   duration?: number;
   imageUrl?: string;
   caption?: string;
+  reactions?: Record<string, string[]>;
   timestamp: number;
-  readBy?: string[];
+}
+
+export interface FirebaseWhisperNote {
+  id: string;
+  text: string;
+  sender?: string;
+  date: string;
+  timestamp: number;
+}
+
+export interface FirebaseDateNightItem {
+  id: string;
+  malId: number;
+  title: string;
+  image: string;
+  addedAt: number;
+  watched: boolean;
+  ourRating?: number;
+  coupleComment?: string;
 }
 
 /**
  * Real-time subscription to the couple's live love scrolls.
- * Supports text decrees, browser voice notes, and compressed photos.
+ * Supports text decrees, browser voice notes, compressed photos, and reactions.
  */
 export function subscribeToLoveScrolls(onUpdate: (messages: FirebaseLoveScroll[]) => void): () => void {
+  const collectionPath = 'loveScrolls';
   try {
-    const q = query(collection(db, 'loveScrolls'), orderBy('timestamp', 'asc'), limit(150));
+    const q = query(collection(db, collectionPath), orderBy('timestamp', 'asc'), limit(250));
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
@@ -73,20 +127,20 @@ export function subscribeToLoveScrolls(onUpdate: (messages: FirebaseLoveScroll[]
               duration: data.duration,
               imageUrl: data.imageUrl,
               caption: data.caption,
-              timestamp: data.timestamp || Date.now(),
-              readBy: Array.isArray(data.readBy) ? data.readBy : [data.senderRole || 'demigod']
+              reactions: data.reactions || {},
+              timestamp: data.timestamp || Date.now()
             });
           }
         });
         onUpdate(msgs);
       },
       (error) => {
-        console.warn('[Firestore] loveScrolls subscription warning:', error);
+        handleFirestoreError(error, OperationType.GET, collectionPath);
       }
     );
     return unsubscribe;
   } catch (err) {
-    console.warn('[Firestore] Error initializing loveScrolls listener:', err);
+    handleFirestoreError(err, OperationType.GET, collectionPath);
     return () => {};
   }
 }
@@ -95,6 +149,7 @@ export function subscribeToLoveScrolls(onUpdate: (messages: FirebaseLoveScroll[]
  * Save a new love scroll or multimedia note to Cloud Firestore.
  */
 export async function pushLoveScrollToCloud(scroll: FirebaseLoveScroll): Promise<boolean> {
+  const docPath = `loveScrolls/${scroll.id}`;
   try {
     const docRef = doc(db, 'loveScrolls', scroll.id);
     const payload: Record<string, any> = {
@@ -102,50 +157,207 @@ export async function pushLoveScrollToCloud(scroll: FirebaseLoveScroll): Promise
       sender: scroll.sender,
       senderRole: scroll.senderRole,
       type: scroll.type || 'text',
-      timestamp: scroll.timestamp,
-      readBy: scroll.readBy || [scroll.senderRole]
+      timestamp: scroll.timestamp
     };
     if (scroll.text !== undefined) payload.text = scroll.text;
     if (scroll.audioUrl) payload.audioUrl = scroll.audioUrl;
     if (scroll.duration) payload.duration = scroll.duration;
     if (scroll.imageUrl) payload.imageUrl = scroll.imageUrl;
     if (scroll.caption) payload.caption = scroll.caption;
+    if (scroll.reactions) payload.reactions = scroll.reactions;
 
-    await setDoc(docRef, payload);
+    await setDoc(docRef, payload, { merge: true });
     return true;
   } catch (err) {
-    console.error('[Firestore] Failed to save love scroll:', err);
+    handleFirestoreError(err, OperationType.WRITE, docPath);
     return false;
   }
 }
 
 /**
- * Mark messages in Cloud Firestore as read by a specific partner role (Sir Chif3n or Lady Leslye).
+ * Delete a love scroll from Cloud Firestore.
  */
-export async function markLoveScrollsAsRead(
-  userRole: 'chif3n' | 'leslye',
-  messagesToMark: FirebaseLoveScroll[]
-): Promise<void> {
-  if (!messagesToMark || messagesToMark.length === 0) return;
-
-  const unreadMessages = messagesToMark.filter((m) => {
-    // Only mark messages sent by the other partner that haven't been marked yet
-    return m.senderRole !== userRole && (!m.readBy || !m.readBy.includes(userRole));
-  });
-
-  if (unreadMessages.length === 0) return;
-
+export async function deleteLoveScrollFromCloud(id: string): Promise<boolean> {
+  const docPath = `loveScrolls/${id}`;
   try {
-    const updatePromises = unreadMessages.map(async (msg) => {
-      const docRef = doc(db, 'loveScrolls', msg.id);
-      await updateDoc(docRef, {
-        readBy: arrayUnion(userRole)
-      });
-    });
-
-    await Promise.all(updatePromises);
+    const docRef = doc(db, 'loveScrolls', id);
+    await deleteDoc(docRef);
+    return true;
   } catch (err) {
-    console.warn('[Firestore] Error marking messages as read:', err);
+    handleFirestoreError(err, OperationType.DELETE, docPath);
+    return false;
+  }
+}
+
+/**
+ * React to a love scroll in Cloud Firestore.
+ */
+export async function reactToLoveScrollInCloud(id: string, emoji: string, user: string): Promise<boolean> {
+  const docPath = `loveScrolls/${id}`;
+  try {
+    const docRef = doc(db, 'loveScrolls', id);
+    // Fetch or merge reaction
+    await setDoc(docRef, {
+      reactions: {
+        [emoji]: [user]
+      }
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.UPDATE, docPath);
+    return false;
+  }
+}
+
+/**
+ * Real-time subscription to Lady Leslye's Herbal Diary & Whispers.
+ */
+export function subscribeToWhisperNotes(onUpdate: (notes: FirebaseWhisperNote[]) => void): () => void {
+  const collectionPath = 'whisperNotes';
+  try {
+    const q = query(collection(db, collectionPath), orderBy('timestamp', 'desc'), limit(150));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const notes: FirebaseWhisperNote[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as FirebaseWhisperNote;
+          if (data && data.text) {
+            notes.push({
+              id: data.id || docSnap.id,
+              text: data.text,
+              sender: data.sender || 'Lady Leslye 🌿',
+              date: data.date || 'Today',
+              timestamp: data.timestamp || Date.now()
+            });
+          }
+        });
+        onUpdate(notes);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, collectionPath);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, collectionPath);
+    return () => {};
+  }
+}
+
+/**
+ * Push a new whisper note to Cloud Firestore.
+ */
+export async function pushWhisperNoteToCloud(note: FirebaseWhisperNote): Promise<boolean> {
+  const docPath = `whisperNotes/${note.id}`;
+  try {
+    const docRef = doc(db, 'whisperNotes', note.id);
+    await setDoc(docRef, {
+      id: note.id,
+      text: note.text,
+      sender: note.sender || 'Lady Leslye 🌿',
+      date: note.date,
+      timestamp: note.timestamp || Date.now()
+    });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, docPath);
+    return false;
+  }
+}
+
+/**
+ * Delete a whisper note from Cloud Firestore.
+ */
+export async function deleteWhisperNoteFromCloud(id: string): Promise<boolean> {
+  const docPath = `whisperNotes/${id}`;
+  try {
+    const docRef = doc(db, 'whisperNotes', id);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, docPath);
+    return false;
+  }
+}
+
+/**
+ * Real-time subscription to Date Night Queue items.
+ */
+export function subscribeToDateNightQueue(onUpdate: (items: FirebaseDateNightItem[]) => void): () => void {
+  const collectionPath = 'dateNightQueue';
+  try {
+    const q = query(collection(db, collectionPath), orderBy('addedAt', 'desc'), limit(100));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const items: FirebaseDateNightItem[] = [];
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data() as FirebaseDateNightItem;
+          if (data && data.malId && data.title) {
+            items.push({
+              id: data.id || docSnap.id,
+              malId: data.malId,
+              title: data.title,
+              image: data.image || '',
+              addedAt: data.addedAt || Date.now(),
+              watched: !!data.watched,
+              ourRating: typeof data.ourRating === 'number' ? data.ourRating : 5,
+              coupleComment: data.coupleComment || ''
+            });
+          }
+        });
+        onUpdate(items);
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.GET, collectionPath);
+      }
+    );
+    return unsubscribe;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.GET, collectionPath);
+    return () => {};
+  }
+}
+
+/**
+ * Sync a Date Night item to Cloud Firestore.
+ */
+export async function syncDateNightItemToCloud(item: FirebaseDateNightItem): Promise<boolean> {
+  const docId = item.id || `dn-${item.malId}`;
+  const docPath = `dateNightQueue/${docId}`;
+  try {
+    const docRef = doc(db, 'dateNightQueue', docId);
+    await setDoc(docRef, {
+      id: docId,
+      malId: item.malId,
+      title: item.title,
+      image: item.image || '',
+      addedAt: item.addedAt || Date.now(),
+      watched: !!item.watched,
+      ourRating: item.ourRating !== undefined ? item.ourRating : 5,
+      coupleComment: item.coupleComment || ''
+    }, { merge: true });
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.WRITE, docPath);
+    return false;
+  }
+}
+
+/**
+ * Remove a Date Night item from Cloud Firestore.
+ */
+export async function removeDateNightItemFromCloud(idOrMalId: string | number): Promise<boolean> {
+  const docId = typeof idOrMalId === 'number' ? `dn-${idOrMalId}` : (idOrMalId.startsWith('dn-') ? idOrMalId : `dn-${idOrMalId}`);
+  const docPath = `dateNightQueue/${docId}`;
+  try {
+    const docRef = doc(db, 'dateNightQueue', docId);
+    await deleteDoc(docRef);
+    return true;
+  } catch (err) {
+    handleFirestoreError(err, OperationType.DELETE, docPath);
+    return false;
   }
 }
 
@@ -154,6 +366,7 @@ export async function markLoveScrollsAsRead(
  * Syncs Tic-Tac-Toe, Gomoku, Trivia, and Alchemy card flips across both devices.
  */
 export function subscribeToArcadeCloud(onUpdate: (arcadeState: any) => void): () => void {
+  const path = 'coupleArcade/imperial_state';
   try {
     const docRef = doc(db, 'coupleArcade', 'imperial_state');
     const unsubscribe = onSnapshot(
@@ -167,12 +380,12 @@ export function subscribeToArcadeCloud(onUpdate: (arcadeState: any) => void): ()
         }
       },
       (error) => {
-        console.warn('[Firestore] coupleArcade subscription warning:', error);
+        handleFirestoreError(error, OperationType.GET, path);
       }
     );
     return unsubscribe;
   } catch (err) {
-    console.warn('[Firestore] Error initializing coupleArcade listener:', err);
+    handleFirestoreError(err, OperationType.GET, path);
     return () => {};
   }
 }
@@ -181,6 +394,7 @@ export function subscribeToArcadeCloud(onUpdate: (arcadeState: any) => void): ()
  * Sync Imperial Arcade moves to Cloud Firestore.
  */
 export async function syncArcadeToCloud(arcadeState: any): Promise<boolean> {
+  const path = 'coupleArcade/imperial_state';
   try {
     const docRef = doc(db, 'coupleArcade', 'imperial_state');
     await setDoc(docRef, {
@@ -189,7 +403,7 @@ export async function syncArcadeToCloud(arcadeState: any): Promise<boolean> {
     }, { merge: true });
     return true;
   } catch (err) {
-    console.error('[Firestore] Failed to sync arcade state:', err);
+    handleFirestoreError(err, OperationType.WRITE, path);
     return false;
   }
 }
@@ -207,6 +421,7 @@ export interface ArcadeCloudState {
  * Real-time listener for the globalSharedSession document in Firestore
  */
 export function subscribeToActiveArcadeSession(onUpdate: (state: ArcadeCloudState) => void): () => void {
+  const path = 'coupleArcade/globalSharedSession';
   try {
     const docRef = doc(db, 'coupleArcade', 'globalSharedSession');
     const unsubscribe = onSnapshot(
@@ -220,12 +435,12 @@ export function subscribeToActiveArcadeSession(onUpdate: (state: ArcadeCloudStat
         }
       },
       (error) => {
-        console.warn('[Firestore] globalSharedSession subscription warning:', error);
+        handleFirestoreError(error, OperationType.GET, path);
       }
     );
     return unsubscribe;
   } catch (err) {
-    console.warn('[Firestore] Error initializing globalSharedSession listener:', err);
+    handleFirestoreError(err, OperationType.GET, path);
     return () => {};
   }
 }
@@ -234,6 +449,7 @@ export function subscribeToActiveArcadeSession(onUpdate: (state: ArcadeCloudStat
  * Update the shared globalSharedSession document in Firestore
  */
 export async function updateActiveArcadeSession(state: Partial<ArcadeCloudState>): Promise<boolean> {
+  const path = 'coupleArcade/globalSharedSession';
   try {
     const docRef = doc(db, 'coupleArcade', 'globalSharedSession');
     await setDoc(docRef, {
@@ -242,292 +458,8 @@ export async function updateActiveArcadeSession(state: Partial<ArcadeCloudState>
     }, { merge: true });
     return true;
   } catch (err) {
-    console.error('[Firestore] Failed to update globalSharedSession:', err);
+    handleFirestoreError(err, OperationType.WRITE, path);
     return false;
   }
 }
-
-// -------------------------------------------------------------
-// WATCH PARTY & REAL-TIME VIDEO PLAYHEAD SYNCHRONIZATION
-// -------------------------------------------------------------
-export interface DanmakuReaction {
-  id: string;
-  sender: string;
-  icon: string;
-  text?: string;
-  color: string;
-  timestamp: number;
-}
-
-export interface WatchPartySession {
-  animeMalId: number;
-  animeTitle: string;
-  episode: number;
-  currentTime: number;
-  isPlaying: boolean;
-  lastUpdated: number;
-  updatedBy: 'chif3n' | 'leslye';
-  danmaku?: DanmakuReaction[];
-}
-
-export function subscribeToWatchPartySession(onUpdate: (session: WatchPartySession) => void): () => void {
-  try {
-    const docRef = doc(db, 'watchParty', 'globalSession');
-    const unsubscribe = onSnapshot(
-      docRef,
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data() as WatchPartySession;
-          if (data && data.animeMalId) {
-            onUpdate(data);
-          }
-        }
-      },
-      (error) => {
-        console.warn('[Firestore] watchParty subscription warning:', error);
-      }
-    );
-    return unsubscribe;
-  } catch (err) {
-    console.warn('[Firestore] Error initializing watchParty listener:', err);
-    return () => {};
-  }
-}
-
-export async function updateWatchPartySession(patch: Partial<WatchPartySession>): Promise<boolean> {
-  try {
-    const docRef = doc(db, 'watchParty', 'globalSession');
-    await setDoc(docRef, {
-      ...patch,
-      lastUpdated: Date.now()
-    }, { merge: true });
-    return true;
-  } catch (err) {
-    console.error('[Firestore] Failed to update watchParty session:', err);
-    return false;
-  }
-}
-
-export async function broadcastDanmaku(danmakuItem: DanmakuReaction): Promise<boolean> {
-  try {
-    const docRef = doc(db, 'watchParty', 'globalSession');
-    await setDoc(docRef, {
-      lastDanmaku: danmakuItem,
-      lastUpdated: Date.now()
-    }, { merge: true });
-    return true;
-  } catch (err) {
-    console.error('[Firestore] Failed to broadcast danmaku:', err);
-    return false;
-  }
-}
-
-// -------------------------------------------------------------
-// IMPERIAL MOOD HERB STATUS
-// -------------------------------------------------------------
-export interface MoodHerbStatus {
-  moodId: string;
-  emoji: string;
-  label: string;
-  note?: string;
-  updatedBy: 'chif3n' | 'leslye';
-  lastUpdated: number;
-}
-
-export function subscribeToMoodHerbStatus(onUpdate: (status: MoodHerbStatus) => void): () => void {
-  try {
-    const docRef = doc(db, 'coupleStatus', 'moodPill');
-    const unsubscribe = onSnapshot(
-      docRef,
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data() as MoodHerbStatus;
-          if (data && data.moodId) {
-            onUpdate(data);
-          }
-        }
-      },
-      (error) => {
-        console.warn('[Firestore] moodPill subscription warning:', error);
-      }
-    );
-    return unsubscribe;
-  } catch (err) {
-    console.warn('[Firestore] Error initializing moodPill listener:', err);
-    return () => {};
-  }
-}
-
-export async function updateMoodHerbStatus(status: MoodHerbStatus): Promise<boolean> {
-  try {
-    const docRef = doc(db, 'coupleStatus', 'moodPill');
-    await setDoc(docRef, {
-      ...status,
-      lastUpdated: Date.now()
-    });
-    return true;
-  } catch (err) {
-    console.error('[Firestore] Failed to update mood status:', err);
-    return false;
-  }
-}
-
-// -------------------------------------------------------------
-// TIME-LOCKED IMPERIAL VOICE & LOVE CAPSULES
-// -------------------------------------------------------------
-export interface TimeLockedCapsule {
-  id: string;
-  authorRole: 'chif3n' | 'leslye';
-  authorName: string;
-  title: string;
-  unlockTimestamp: number;
-  createdTimestamp: number;
-  messageType: 'text' | 'voice' | 'image';
-  content: string; // text decree, base64 voice note data url, or image data url
-  sealDesign: string; // 'imperial-gold' | 'jade-apothecary' | 'rose-demigod'
-  isOpened?: boolean;
-}
-
-export function subscribeToTimeLockedCapsules(onUpdate: (capsules: TimeLockedCapsule[]) => void): () => void {
-  try {
-    const q = query(collection(db, 'timeCapsules'), orderBy('createdTimestamp', 'desc'), limit(50));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const list: TimeLockedCapsule[] = [];
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data() as TimeLockedCapsule;
-          if (data && data.id) {
-            list.push(data);
-          }
-        });
-        onUpdate(list);
-      },
-      (error) => {
-        console.warn('[Firestore] timeCapsules subscription warning:', error);
-      }
-    );
-    return unsubscribe;
-  } catch (err) {
-    console.warn('[Firestore] Error initializing timeCapsules listener:', err);
-    return () => {};
-  }
-}
-
-export async function saveTimeLockedCapsule(capsule: TimeLockedCapsule): Promise<boolean> {
-  try {
-    const docRef = doc(db, 'timeCapsules', capsule.id);
-    await setDoc(docRef, capsule);
-    return true;
-  } catch (err) {
-    console.error('[Firestore] Failed to save time capsule:', err);
-    return false;
-  }
-}
-
-// =========================================================================
-// IMPERIAL VOICE & VIDEO CALL SIGNALING ENGINE (Real-Time WebRTC Link)
-// =========================================================================
-
-export interface CoupleCallSession {
-  callId: string;
-  callerRole: 'chif3n' | 'leslye';
-  callerName: string;
-  receiverRole: 'chif3n' | 'leslye';
-  type: 'audio' | 'video';
-  status: 'calling' | 'connected' | 'ended' | 'declined';
-  timestamp: number;
-  offer?: any;
-  answer?: any;
-  callerCandidates?: any[];
-  receiverCandidates?: any[];
-}
-
-/**
- * Real-time listener for incoming & ongoing calls between Sir Chif3n and Lady Leslye.
- */
-export function subscribeToCallSession(onUpdate: (session: CoupleCallSession | null) => void): () => void {
-  try {
-    const docRef = doc(db, 'coupleCall', 'current_session');
-    const unsubscribe = onSnapshot(
-      docRef,
-      (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data() as CoupleCallSession;
-          onUpdate(data);
-        } else {
-          onUpdate(null);
-        }
-      },
-      (err) => {
-        console.warn('[Firestore] call session listener warning:', err);
-      }
-    );
-    return unsubscribe;
-  } catch (err) {
-    console.warn('[Firestore] Error subscribing to call session:', err);
-    return () => {};
-  }
-}
-
-/**
- * Initiate an Imperial Voice or Video Call
- */
-export async function startCallSession(session: Omit<CoupleCallSession, 'timestamp'>): Promise<boolean> {
-  try {
-    const docRef = doc(db, 'coupleCall', 'current_session');
-    await setDoc(docRef, {
-      ...session,
-      timestamp: Date.now()
-    });
-    return true;
-  } catch (err) {
-    console.error('[Firestore] Failed to start call session:', err);
-    return false;
-  }
-}
-
-/**
- * Answer an incoming call with SDP Answer and status 'connected'
- */
-export async function answerCallSession(answerPayload: { answer?: any; status: 'connected' | 'declined' }): Promise<boolean> {
-  try {
-    const docRef = doc(db, 'coupleCall', 'current_session');
-    await setDoc(docRef, answerPayload, { merge: true });
-    return true;
-  } catch (err) {
-    console.error('[Firestore] Failed to answer call session:', err);
-    return false;
-  }
-}
-
-/**
- * Add an ICE candidate during WebRTC peer negotiation
- */
-export async function addCallIceCandidate(role: 'caller' | 'receiver', candidate: any): Promise<void> {
-  try {
-    const docRef = doc(db, 'coupleCall', 'current_session');
-    const field = role === 'caller' ? 'callerCandidates' : 'receiverCandidates';
-    await updateDoc(docRef, {
-      [field]: arrayUnion(JSON.stringify(candidate))
-    });
-  } catch (err) {
-    console.warn('[Firestore] Could not push ICE candidate:', err);
-  }
-}
-
-/**
- * End or terminate the active call session
- */
-export async function endCallSession(): Promise<boolean> {
-  try {
-    const docRef = doc(db, 'coupleCall', 'current_session');
-    await setDoc(docRef, { status: 'ended', endedAt: Date.now() }, { merge: true });
-    return true;
-  } catch (err) {
-    console.error('[Firestore] Failed to end call session:', err);
-    return false;
-  }
-}
-
 

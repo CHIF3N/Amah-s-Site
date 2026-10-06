@@ -85,6 +85,9 @@ export async function searchAnime(query: string): Promise<AnimeItem[]> {
       if (media.length > 0) {
         const results = media.map((m: any) => ({
           mal_id: m.idMal || m.id,
+          idMal: m.idMal,
+          id: m.id,
+          anilist_id: m.id,
           title: m.title.romaji || m.title.english,
           title_english: m.title.english || m.title.romaji,
           title_japanese: m.title.native,

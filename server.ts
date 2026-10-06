@@ -29,8 +29,33 @@ export interface LiveLoveScroll {
   id: string;
   sender: string;
   senderRole: 'chif3n' | 'leslye' | 'demigod';
-  text: string;
+  type?: 'text' | 'audio' | 'image';
+  text?: string;
+  audioUrl?: string;
+  duration?: number;
+  imageUrl?: string;
+  caption?: string;
+  reactions?: Record<string, string[]>;
   timestamp: number;
+}
+
+export interface LiveWhisperNote {
+  id: string;
+  text: string;
+  sender?: string;
+  date: string;
+  timestamp: number;
+}
+
+export interface LiveDateNightItem {
+  id: string;
+  malId: number;
+  title: string;
+  image: string;
+  addedAt: number;
+  watched: boolean;
+  ourRating: number;
+  coupleComment: string;
 }
 
 const liveLoveScrolls: LiveLoveScroll[] = [
@@ -38,6 +63,7 @@ const liveLoveScrolls: LiveLoveScroll[] = [
     id: 'scroll-initial-1',
     sender: 'Sir Chif3n (Demigod) 👑',
     senderRole: 'chif3n',
+    type: 'text',
     text: "Welcome to your royal sanctuary, my sweet Leslye! Every single frame and scroll in this realm was built for your comfort and joy. 🌿❤️",
     timestamp: Date.now() - 1000 * 60 * 60 * 4
   },
@@ -45,6 +71,7 @@ const liveLoveScrolls: LiveLoveScroll[] = [
     id: 'scroll-initial-2',
     sender: 'Sir Chif3n (Demigod) 👑',
     senderRole: 'chif3n',
+    type: 'text',
     text: "Ready for our next Date Night stream? I've got your favorite blanket and snacks waiting! ✨",
     timestamp: Date.now() - 1000 * 60 * 60 * 2
   },
@@ -52,21 +79,63 @@ const liveLoveScrolls: LiveLoveScroll[] = [
     id: 'scroll-initial-3',
     sender: 'Lady Leslye (Maomao) 🌿',
     senderRole: 'leslye',
+    type: 'text',
     text: "Thank you for creating this magical realm for me, Sir Chif3n! You are the best boyfriend in the entire world 💚",
     timestamp: Date.now() - 1000 * 60 * 30
+  }
+];
+
+const liveWhisperNotes: LiveWhisperNote[] = [
+  {
+    id: 'note-initial-1',
+    text: 'Thank you for building my Maomao apothecary realm, Sir Chif3n. You are my favorite protector! 💚',
+    sender: 'Lady Leslye 🌿',
+    date: 'Today',
+    timestamp: Date.now() - 1000 * 60 * 60 * 6
+  }
+];
+
+const liveDateNightQueue: LiveDateNightItem[] = [
+  {
+    id: 'dn-54492',
+    malId: 54492,
+    title: 'The Apothecary Diaries',
+    image: 'https://cdn.myanimelist.net/images/anime/1708/138033.jpg',
+    addedAt: Date.now() - 1000 * 60 * 60 * 24,
+    watched: false,
+    ourRating: 5,
+    coupleComment: 'Our crown jewel anime! Maomao is literally Leslye 🌿✨'
+  },
+  {
+    id: 'dn-52991',
+    malId: 52991,
+    title: "Frieren: Beyond Journey's End",
+    image: 'https://cdn.myanimelist.net/images/anime/1015/138006.jpg',
+    addedAt: Date.now() - 1000 * 60 * 60 * 48,
+    watched: true,
+    ourRating: 5,
+    coupleComment: 'Loved every single second of watching this together.'
   }
 ];
 
 // Active WebSocket clients set
 const connectedClients = new Set<WebSocket>();
 
-function broadcastScroll(message: LiveLoveScroll) {
-  const payload = JSON.stringify({ type: 'new_message', message });
+function broadcastPayload(payload: any) {
+  const json = JSON.stringify(payload);
   for (const client of connectedClients) {
     if (client.readyState === WebSocket.OPEN) {
-      client.send(payload);
+      try {
+        client.send(json);
+      } catch (err) {
+        console.warn('WebSocket send error:', err);
+      }
     }
   }
+}
+
+function broadcastScroll(message: LiveLoveScroll) {
+  broadcastPayload({ type: 'new_message', message });
 }
 
 // Enable CORS
@@ -872,7 +941,8 @@ function checkBoardWin(board: (string | null)[][], size: number, winLength: numb
 }
 
 // -------------------------------------------------------------
-// 6. Real-time Love Scrolls API Endpoints
+// -------------------------------------------------------------
+// 6. Real-time Love Scrolls & Messages API Endpoints
 // -------------------------------------------------------------
 app.get('/api/scrolls', (req: Request, res: Response) => {
   const since = parseInt(req.query.since as string, 10);
@@ -888,21 +958,33 @@ app.get('/api/scrolls', (req: Request, res: Response) => {
 });
 
 app.post('/api/scrolls', (req: Request, res: Response) => {
-  const { sender, senderRole, text } = req.body;
-  if (!text || !text.trim()) {
-    return res.status(400).json({ success: false, message: 'Message text cannot be empty' });
+  const { sender, senderRole, text, type, audioUrl, duration, imageUrl, caption, reactions } = req.body;
+  const hasText = text && typeof text === 'string' && text.trim().length > 0;
+  const hasAudio = !!audioUrl;
+  const hasImage = !!imageUrl;
+
+  if (!hasText && !hasAudio && !hasImage) {
+    return res.status(400).json({ success: false, message: 'Message payload must have text, audio, or image' });
   }
 
+  const determinedType = type || (hasAudio ? 'audio' : hasImage ? 'image' : 'text');
+
   const newScroll: LiveLoveScroll = {
-    id: `scroll-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id: req.body.id || `scroll-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     sender: sender?.trim() || 'Sir Chif3n (Demigod) 👑',
     senderRole: senderRole || 'chif3n',
-    text: text.trim(),
+    type: determinedType,
+    text: hasText ? text.trim() : undefined,
+    audioUrl: audioUrl || undefined,
+    duration: typeof duration === 'number' ? duration : undefined,
+    imageUrl: imageUrl || undefined,
+    caption: caption ? String(caption).trim() : undefined,
+    reactions: reactions || {},
     timestamp: Date.now()
   };
 
   liveLoveScrolls.push(newScroll);
-  if (liveLoveScrolls.length > 200) {
+  if (liveLoveScrolls.length > 300) {
     liveLoveScrolls.shift();
   }
 
@@ -916,11 +998,139 @@ app.post('/api/scrolls', (req: Request, res: Response) => {
   });
 });
 
+app.delete('/api/scrolls/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const idx = liveLoveScrolls.findIndex(m => m.id === id);
+  if (idx !== -1) {
+    liveLoveScrolls.splice(idx, 1);
+    broadcastPayload({ type: 'delete_message', id });
+    return res.json({ success: true, id });
+  }
+  res.status(404).json({ success: false, message: 'Scroll not found' });
+});
+
+app.post('/api/scrolls/:id/react', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { emoji, user } = req.body;
+  if (!emoji || !user) {
+    return res.status(400).json({ success: false, message: 'Missing emoji or user' });
+  }
+
+  const msg = liveLoveScrolls.find(m => m.id === id);
+  if (msg) {
+    if (!msg.reactions) msg.reactions = {};
+    if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
+    const list = msg.reactions[emoji];
+    const uIdx = list.indexOf(user);
+    if (uIdx === -1) {
+      list.push(user);
+    } else {
+      list.splice(uIdx, 1);
+      if (list.length === 0) delete msg.reactions[emoji];
+    }
+    broadcastPayload({ type: 'update_message_reactions', id, reactions: msg.reactions });
+    return res.json({ success: true, reactions: msg.reactions });
+  }
+  res.status(404).json({ success: false, message: 'Scroll not found' });
+});
+
+// -------------------------------------------------------------
+// Herbal Diary & Whispers API Endpoints (Lady Leslye's Whispers)
+// -------------------------------------------------------------
+app.get('/api/notes', (req: Request, res: Response) => {
+  res.json({ success: true, notes: liveWhisperNotes });
+});
+
+app.post('/api/notes', (req: Request, res: Response) => {
+  const { text, sender, date } = req.body;
+  if (!text || !String(text).trim()) {
+    return res.status(400).json({ success: false, message: 'Note text cannot be empty' });
+  }
+
+  const newNote: LiveWhisperNote = {
+    id: req.body.id || `note-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    text: String(text).trim(),
+    sender: sender?.trim() || 'Lady Leslye 🌿',
+    date: date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    timestamp: Date.now()
+  };
+
+  liveWhisperNotes.unshift(newNote);
+  if (liveWhisperNotes.length > 200) liveWhisperNotes.pop();
+
+  broadcastPayload({ type: 'new_whisper', note: newNote });
+  res.json({ success: true, note: newNote });
+});
+
+app.delete('/api/notes/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const idx = liveWhisperNotes.findIndex(n => n.id === id);
+  if (idx !== -1) {
+    liveWhisperNotes.splice(idx, 1);
+    broadcastPayload({ type: 'delete_whisper', id });
+    return res.json({ success: true, id });
+  }
+  res.status(404).json({ success: false, message: 'Note not found' });
+});
+
+// -------------------------------------------------------------
+// Date Night Queue API Endpoints
+// -------------------------------------------------------------
+app.get('/api/datenight', (req: Request, res: Response) => {
+  res.json({ success: true, items: liveDateNightQueue });
+});
+
+app.post('/api/datenight', (req: Request, res: Response) => {
+  const { malId, title, image, coupleComment, ourRating, watched } = req.body;
+  if (!malId || !title) {
+    return res.status(400).json({ success: false, message: 'Missing malId or title' });
+  }
+
+  const existingIdx = liveDateNightQueue.findIndex(i => i.malId === Number(malId));
+  if (existingIdx !== -1) {
+    // Update existing
+    liveDateNightQueue[existingIdx] = {
+      ...liveDateNightQueue[existingIdx],
+      coupleComment: coupleComment !== undefined ? coupleComment : liveDateNightQueue[existingIdx].coupleComment,
+      ourRating: ourRating !== undefined ? ourRating : liveDateNightQueue[existingIdx].ourRating,
+      watched: watched !== undefined ? watched : liveDateNightQueue[existingIdx].watched
+    };
+    broadcastPayload({ type: 'datenight_update', items: liveDateNightQueue });
+    return res.json({ success: true, items: liveDateNightQueue, item: liveDateNightQueue[existingIdx] });
+  }
+
+  const newItem: LiveDateNightItem = {
+    id: `dn-${malId}`,
+    malId: Number(malId),
+    title: String(title),
+    image: image || '',
+    addedAt: Date.now(),
+    watched: !!watched,
+    ourRating: typeof ourRating === 'number' ? ourRating : 5,
+    coupleComment: coupleComment || 'Saved for Date Night stream! 🍿'
+  };
+
+  liveDateNightQueue.unshift(newItem);
+  broadcastPayload({ type: 'datenight_update', items: liveDateNightQueue });
+  res.json({ success: true, items: liveDateNightQueue, item: newItem });
+});
+
+app.delete('/api/datenight/:malId', (req: Request, res: Response) => {
+  const malId = Number(req.params.malId);
+  const idx = liveDateNightQueue.findIndex(i => i.malId === malId);
+  if (idx !== -1) {
+    liveDateNightQueue.splice(idx, 1);
+    broadcastPayload({ type: 'datenight_update', items: liveDateNightQueue });
+    return res.json({ success: true, items: liveDateNightQueue });
+  }
+  res.status(404).json({ success: false, message: 'Item not found' });
+});
+
 // Webhook endpoint for external integrations, cloud relays & notifications
 app.post('/api/webhook/chat', (req: Request, res: Response) => {
-  const { sender, senderRole, text, message, content, author } = req.body;
+  const { sender, senderRole, text, message, content, author, type, audioUrl, imageUrl } = req.body;
   const msgText = (text || message || content || '').trim();
-  if (!msgText) {
+  if (!msgText && !audioUrl && !imageUrl) {
     return res.status(400).json({ success: false, message: 'Missing message content' });
   }
 
@@ -928,12 +1138,15 @@ app.post('/api/webhook/chat', (req: Request, res: Response) => {
     id: `scroll-wh-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     sender: (sender || author || 'Imperial Envoy 📜').trim(),
     senderRole: senderRole || 'demigod',
-    text: msgText,
+    type: type || (audioUrl ? 'audio' : imageUrl ? 'image' : 'text'),
+    text: msgText || undefined,
+    audioUrl: audioUrl || undefined,
+    imageUrl: imageUrl || undefined,
     timestamp: Date.now()
   };
 
   liveLoveScrolls.push(newScroll);
-  if (liveLoveScrolls.length > 200) liveLoveScrolls.shift();
+  if (liveLoveScrolls.length > 300) liveLoveScrolls.shift();
   broadcastScroll(newScroll);
 
   res.json({ success: true, message: newScroll, webhook: true });
@@ -1199,37 +1412,95 @@ app.post('/api/game/alchemy/reset', (req: Request, res: Response) => {
 async function startServer() {
   const server = http.createServer(app);
 
-  // Initialize WebSocket server attached to the HTTP server
-  const wss = new WebSocketServer({ server });
+  // Initialize WebSocket server attached with dedicated upgrade routing
+  const wss = new WebSocketServer({ noServer: true });
+
+  server.on('upgrade', (request, socket, head) => {
+    const url = request.url || '';
+    // Let Vite HMR handle its own upgrade protocol
+    const protocol = request.headers['sec-websocket-protocol'];
+    if (protocol === 'vite-hmr') {
+      return;
+    }
+
+    if (url.startsWith('/ws') || url === '/ws/chat' || url === '/api/ws' || url === '/') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
+  });
 
   wss.on('connection', (ws: WebSocket) => {
     connectedClients.add(ws);
 
-    // Send existing love scrolls history and arcade state immediately upon connect
-    ws.send(JSON.stringify({
-      type: 'init',
-      messages: liveLoveScrolls,
-      arcade: coupleArcadeState
-    }));
+    // Send complete current live sync snapshot immediately upon connect
+    try {
+      ws.send(JSON.stringify({
+        type: 'init',
+        messages: liveLoveScrolls,
+        whispers: liveWhisperNotes,
+        dateNightItems: liveDateNightQueue,
+        arcade: coupleArcadeState,
+        serverTime: Date.now()
+      }));
+    } catch (e) {
+      console.warn('Initial WebSocket handshake failed:', e);
+    }
 
     ws.on('message', (data: any) => {
       try {
         const parsed = JSON.parse(data.toString());
-        if (parsed.type === 'send_message' && parsed.text && parsed.text.trim()) {
-          const newScroll: LiveLoveScroll = {
-            id: `scroll-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-            sender: parsed.sender?.trim() || 'Sir Chif3n (Demigod) 👑',
-            senderRole: parsed.senderRole || 'chif3n',
-            text: parsed.text.trim(),
-            timestamp: Date.now()
-          };
 
-          liveLoveScrolls.push(newScroll);
-          if (liveLoveScrolls.length > 200) {
-            liveLoveScrolls.shift();
+        if (parsed.type === 'send_message') {
+          const hasText = parsed.text && typeof parsed.text === 'string' && parsed.text.trim().length > 0;
+          const hasAudio = !!parsed.audioUrl;
+          const hasImage = !!parsed.imageUrl;
+
+          if (hasText || hasAudio || hasImage) {
+            const newScroll: LiveLoveScroll = {
+              id: parsed.id || `scroll-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+              sender: parsed.sender?.trim() || 'Sir Chif3n (Demigod) 👑',
+              senderRole: parsed.senderRole || 'chif3n',
+              type: parsed.type || (hasAudio ? 'audio' : hasImage ? 'image' : 'text'),
+              text: hasText ? parsed.text.trim() : undefined,
+              audioUrl: parsed.audioUrl || undefined,
+              duration: typeof parsed.duration === 'number' ? parsed.duration : undefined,
+              imageUrl: parsed.imageUrl || undefined,
+              caption: parsed.caption ? String(parsed.caption).trim() : undefined,
+              reactions: parsed.reactions || {},
+              timestamp: parsed.timestamp || Date.now()
+            };
+
+            liveLoveScrolls.push(newScroll);
+            if (liveLoveScrolls.length > 300) {
+              liveLoveScrolls.shift();
+            }
+
+            broadcastScroll(newScroll);
           }
-
-          broadcastScroll(newScroll);
+        } else if (parsed.type === 'delete_message' && parsed.id) {
+          const idx = liveLoveScrolls.findIndex(m => m.id === parsed.id);
+          if (idx !== -1) {
+            liveLoveScrolls.splice(idx, 1);
+            broadcastPayload({ type: 'delete_message', id: parsed.id });
+          }
+        } else if (parsed.type === 'react_message' && parsed.id && parsed.emoji && parsed.user) {
+          const msg = liveLoveScrolls.find(m => m.id === parsed.id);
+          if (msg) {
+            if (!msg.reactions) msg.reactions = {};
+            if (!msg.reactions[parsed.emoji]) msg.reactions[parsed.emoji] = [];
+            const list = msg.reactions[parsed.emoji];
+            const uIdx = list.indexOf(parsed.user);
+            if (uIdx === -1) {
+              list.push(parsed.user);
+            } else {
+              list.splice(uIdx, 1);
+              if (list.length === 0) delete msg.reactions[parsed.emoji];
+            }
+            broadcastPayload({ type: 'update_message_reactions', id: msg.id, reactions: msg.reactions });
+          }
+        } else if (parsed.type === 'typing') {
+          broadcastPayload({ type: 'typing', user: parsed.user, isTyping: !!parsed.isTyping });
         } else if (parsed.type === 'ping_presence' && parsed.player) {
           const now = Date.now();
           if (parsed.player === 'chif3n') {
@@ -1240,6 +1511,16 @@ async function startServer() {
             coupleArcadeState.presence.lastPingLeslye = now;
           }
           broadcastArcadeUpdate();
+        } else if (parsed.type === 'add_whisper' && parsed.note) {
+          liveWhisperNotes.unshift(parsed.note);
+          if (liveWhisperNotes.length > 200) liveWhisperNotes.pop();
+          broadcastPayload({ type: 'new_whisper', note: parsed.note });
+        } else if (parsed.type === 'delete_whisper' && parsed.id) {
+          const nIdx = liveWhisperNotes.findIndex(n => n.id === parsed.id);
+          if (nIdx !== -1) {
+            liveWhisperNotes.splice(nIdx, 1);
+            broadcastPayload({ type: 'delete_whisper', id: parsed.id });
+          }
         }
       } catch (e) {
         console.error('WebSocket message parsing error:', e);

@@ -7,96 +7,43 @@ import {
   Sparkles,
   MessageCircle,
   X,
-  Smile,
-  Shield,
   Clock,
-  RotateCw,
-  Zap,
-  Globe,
   Radio,
-  Check,
-  Cloud,
   CheckCheck,
-  Phone
+  Cloud,
+  Trash2,
+  Volume2,
+  Maximize2
 } from 'lucide-react';
-import { subscribeToLoveScrolls, pushLoveScrollToCloud, FirebaseLoveScroll } from '../services/firebase';
-
-export interface LiveLoveMessage {
-  id: string;
-  sender: string;
-  senderRole: 'chif3n' | 'leslye' | 'demigod';
-  type?: 'text' | 'audio' | 'image';
-  text?: string;
-  audioUrl?: string;
-  duration?: number;
-  imageUrl?: string;
-  caption?: string;
-  timestamp: number;
-}
+import { useRealtimeLoveSync, LiveMessage } from '../hooks/useRealtimeLoveSync';
 
 interface LiveLoveScrollChatboxProps {
   isFloating?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
   onOpenLoginModal?: () => void;
-  onStartCall?: (type: 'audio' | 'video') => void;
+  overrideRole?: 'chif3n' | 'leslye';
+  onRoleChange?: (role: 'chif3n' | 'leslye') => void;
 }
-
-const SEEDED_DEFAULT_SCROLLS: LiveLoveMessage[] = [
-  {
-    id: 'scroll-seed-1',
-    sender: 'Sir Chif3n (Demigod) 👑',
-    senderRole: 'chif3n',
-    text: 'To my precious Maomao, Lady Leslye: Testing all your snacks for poison so you can watch peacefully ❤️',
-    timestamp: Date.now() - 1000 * 60 * 45
-  },
-  {
-    id: 'scroll-seed-2',
-    sender: 'Lady Leslye (Apothecary Empress) 🌿',
-    senderRole: 'leslye',
-    text: 'Thank you Sir Chif3n! Tonight is officially cuddle night. The rear palace can wait! 🍵✨',
-    timestamp: Date.now() - 1000 * 60 * 30
-  },
-  {
-    id: 'scroll-seed-3',
-    sender: 'Sir Chif3n (Demigod) 👑',
-    senderRole: 'chif3n',
-    text: 'Sacred Decree: You are adored beyond measure. Relax your shoulders and lean on me.',
-    timestamp: Date.now() - 1000 * 60 * 15
-  }
-];
 
 const ROMANTIC_PRESETS = [
   'Testing your tea for poison... 🧪',
   'Demigod cuddles on demand ❤️',
   'Sending boba & snacks 🧋',
   'You are my sacred remedy 🌿',
-  'Emergency blanket burrito! 🌯'
+  'Emergency blanket burrito! 🌯',
+  'Sacred decree: Relax your shoulders 💕'
 ];
-
-function getStoredMessages(): LiveLoveMessage[] {
-  try {
-    const saved = localStorage.getItem('imperial_live_scrolls');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch (e) {}
-  return SEEDED_DEFAULT_SCROLLS;
-}
 
 export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
   isFloating = false,
   isOpen = true,
   onClose,
   onOpenLoginModal,
-  onStartCall
+  overrideRole,
+  onRoleChange
 }) => {
-  const [messages, setMessages] = useState<LiveLoveMessage[]>(() => getStoredMessages());
-  const [inputText, setInputText] = useState<string>('');
-  const [activeRole, setActiveRole] = useState<'chif3n' | 'leslye'>(() => {
+  const [internalRole, setInternalRole] = useState<'chif3n' | 'leslye'>(() => {
     try {
       const saved = localStorage.getItem('leslye_active_user');
       if (saved === 'chif3n' || saved === 'leslye') return saved;
@@ -104,13 +51,22 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
     return 'chif3n';
   });
 
-  const [connectionMode, setConnectionMode] = useState<'cloud' | 'live' | 'local'>('cloud');
-  const [showPresets, setShowPresets] = useState<boolean>(false);
+  const activeRole = overrideRole || internalRole;
 
-  const socketRef = useRef<WebSocket | null>(null);
+  const {
+    messages,
+    partnerTyping,
+    connectionStatus,
+    sendMessage,
+    deleteMessage,
+    reactToMessage,
+    sendTypingStatus
+  } = useRealtimeLoveSync(activeRole);
+
+  const [inputText, setInputText] = useState<string>('');
+  const [showPresets, setShowPresets] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastTimestampRef = useRef<number>(0);
-  const channelRef = useRef<BroadcastChannel | null>(null);
+  const typingDebounceRef = useRef<any>(null);
 
   // Auto-scroll to bottom of messages
   const scrollToBottom = () => {
@@ -121,104 +77,37 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
     scrollToBottom();
   }, [messages.length]);
 
-  // Persist messages to local storage and broadcast across tabs
-  const persistMessages = (updated: LiveLoveMessage[]) => {
-    setMessages(updated);
-    try {
-      localStorage.setItem('imperial_live_scrolls', JSON.stringify(updated.slice(-100)));
-      if (channelRef.current) {
-        channelRef.current.postMessage({ type: 'scrolls_update', messages: updated });
-      }
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    // 1. Setup BroadcastChannel for instantaneous cross-tab messaging
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      channelRef.current = new BroadcastChannel('imperial_love_scrolls_channel');
-      channelRef.current.onmessage = (event) => {
-        if (event.data?.type === 'scrolls_update' && Array.isArray(event.data.messages)) {
-          setMessages(event.data.messages);
-        }
-      };
-    }
-
-    // 2. Real-Time Cloud Firestore Sync: Direct worldwide link between phone and laptop
-    const unsubscribeCloud = subscribeToLoveScrolls((cloudMsgs) => {
-      if (cloudMsgs && cloudMsgs.length > 0) {
-        setMessages((prev) => {
-          const map = new Map<string, LiveLoveMessage>();
-          for (const m of prev) map.set(m.id, m);
-          for (const m of cloudMsgs) map.set(m.id, m);
-          const combined = Array.from(map.values()).sort((a, b) => a.timestamp - b.timestamp);
-          try {
-            localStorage.setItem('imperial_live_scrolls', JSON.stringify(combined.slice(-100)));
-          } catch (e) {}
-          return combined;
-        });
-        setConnectionMode('cloud');
-      }
-    });
-
-    return () => {
-      unsubscribeCloud();
-      if (channelRef.current) channelRef.current.close();
-    };
-  }, []);
-
   const handleRoleToggle = (role: 'chif3n' | 'leslye') => {
-    setActiveRole(role);
+    setInternalRole(role);
     try {
       localStorage.setItem('leslye_active_user', role);
       localStorage.setItem('leslye_game_role', role);
     } catch (e) {}
+    if (onRoleChange) onRoleChange(role);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputText(e.target.value);
+    sendTypingStatus(true);
+    clearTimeout(typingDebounceRef.current);
+    typingDebounceRef.current = setTimeout(() => {
+      sendTypingStatus(false);
+    }, 1800);
   };
 
   // Send message
-  const handleSendMessage = async (customText?: string) => {
+  const handleSend = async (customText?: string) => {
     const textToSend = (customText || inputText).trim();
     if (!textToSend) return;
 
     if (!customText) setInputText('');
     setShowPresets(false);
+    sendTypingStatus(false);
 
-    const sender =
-      activeRole === 'leslye'
-        ? 'Lady Leslye (Apothecary Empress) 🌿'
-        : 'Sir Chif3n (Demigod) 👑';
-
-    // 1. Optimistic Local Update (Appears in 0ms on sender's screen)
-    const newScroll: LiveLoveMessage = {
-      id: `scroll-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      sender,
-      senderRole: activeRole,
+    await sendMessage({
       text: textToSend,
-      timestamp: Date.now()
-    };
-
-    const nextMessages = [...messages, newScroll];
-    persistMessages(nextMessages);
-    lastTimestampRef.current = newScroll.timestamp;
-
-    // 2. Push to Cloud Firestore (Transmits globally to her phone/laptop immediately)
-    pushLoveScrollToCloud(newScroll).then((success) => {
-      if (success) {
-        setConnectionMode('cloud');
-      }
+      type: 'text'
     });
-
-    // 3. Also dispatch to local server routes if available
-    try {
-      fetch('/api/scrolls', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sender,
-          senderRole: activeRole,
-          text: textToSend
-        })
-      }).catch(() => {});
-    } catch (err) {}
   };
 
   if (!isOpen) return null;
@@ -227,7 +116,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
     <div
       className={`flex flex-col bg-gradient-to-b from-[#05170f] via-[#030e09] to-[#020906] border border-emerald-500/40 rounded-2xl shadow-2xl overflow-hidden transition-all ${
         isFloating
-          ? 'fixed bottom-20 right-4 sm:right-6 w-[92vw] sm:w-[380px] h-[480px] z-50 animate-in slide-in-from-bottom-5'
+          ? 'fixed bottom-20 right-4 sm:right-6 w-[92vw] sm:w-[380px] h-[500px] z-50 animate-in slide-in-from-bottom-5'
           : 'w-full h-[520px]'
       }`}
     >
@@ -243,28 +132,18 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
                 Live Love Scrolls
               </h3>
               <span className="flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-500/50 text-emerald-300 shadow-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className={`w-1.5 h-1.5 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
                 <Cloud className="w-2.5 h-2.5 text-emerald-400" />
-                <span>Worldwide Cloud Sync</span>
+                <span>{connectionStatus === 'connected' ? 'Live WebSocket + Cloud' : 'Cloud Sync Active'}</span>
               </span>
             </div>
             <span className="text-[10px] text-emerald-400/80 font-mono block">
-              Direct live link between Chif3n's & Leslye's devices
+              Direct instant link between Chif3n's & Leslye's devices
             </span>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5">
-          {onStartCall && (
-            <button
-              onClick={() => onStartCall('audio')}
-              className="p-1 rounded-lg text-emerald-400 hover:text-white hover:bg-emerald-950 transition-colors"
-              title="Start Sacred Call"
-            >
-              <Phone className="w-4 h-4 text-emerald-400" />
-            </button>
-          )}
-
           {onClose && (
             <button
               onClick={onClose}
@@ -323,7 +202,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
           return (
             <div
               key={msg.id}
-              className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate-in fade-in duration-200`}
+              className={`flex flex-col group ${isMe ? 'items-end' : 'items-start'} animate-in fade-in duration-200`}
             >
               {/* Sender Name */}
               <div className="flex items-center gap-1 text-[10px] font-mono mb-1 text-emerald-400/80 px-1">
@@ -337,25 +216,84 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
                 <span className="text-zinc-500 text-[9px]">
                   {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
+                {/* Delete button */}
+                <button
+                  onClick={() => deleteMessage(msg.id)}
+                  className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-rose-400 transition-opacity ml-1 p-0.5"
+                  title="Remove scroll"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
               </div>
 
               {/* Message Bubble */}
               <div
-                className={`max-w-[85%] p-3 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-md ${
+                className={`max-w-[85%] p-3 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-md relative ${
                   isChif3n
                     ? 'bg-gradient-to-br from-[#1c1404] to-[#2b1f06] border border-amber-500/40 text-amber-100 rounded-tr-none'
                     : 'bg-gradient-to-br from-[#062015] to-[#04150d] border border-emerald-500/40 text-emerald-100 rounded-tl-none'
                 }`}
               >
-                <p className="font-serif whitespace-pre-wrap">{msg.text}</p>
-                <div className="flex items-center justify-end gap-1 mt-1 text-[9px] text-emerald-400/60 font-mono">
-                  <CheckCheck className="w-3 h-3 text-emerald-400" />
-                  <span>Synced</span>
+                {/* Voice note indicator */}
+                {msg.type === 'audio' && (
+                  <div className="flex items-center gap-2 p-1.5 rounded-lg bg-black/40 mb-1 border border-amber-500/30 text-amber-200">
+                    <Volume2 className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-[10px] font-mono">Voice Potion ({msg.duration || 5}s)</span>
+                  </div>
+                )}
+
+                {/* Image preview */}
+                {msg.type === 'image' && msg.imageUrl && (
+                  <div className="mb-2 rounded-xl overflow-hidden max-h-48 border border-white/10">
+                    <img src={msg.imageUrl} alt="Scroll Photo" className="w-full object-cover max-h-48" />
+                  </div>
+                )}
+
+                {/* Text */}
+                {msg.text && <p className="font-serif whitespace-pre-wrap">{msg.text}</p>}
+                {msg.caption && <p className="font-serif text-[11px] text-emerald-200/90 mt-1 italic">{msg.caption}</p>}
+
+                {/* Reactions & Synced tick */}
+                <div className="flex items-center justify-between gap-2 mt-1.5 pt-1 border-t border-emerald-950/40">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {['❤️', '🌿', '✨', '🍵'].map((emoji) => {
+                      const count = msg.reactions?.[emoji]?.length || 0;
+                      return (
+                        <button
+                          key={emoji}
+                          onClick={() => reactToMessage(msg.id, emoji)}
+                          className={`text-[10px] px-1.5 py-0.5 rounded-md border transition-all ${
+                            count > 0
+                              ? 'bg-emerald-950/80 border-emerald-500/60 text-emerald-200 shadow-sm'
+                              : 'bg-black/20 border-transparent text-zinc-500 hover:text-emerald-300'
+                          }`}
+                        >
+                          {emoji} {count > 0 && <span className="font-mono text-[9px] font-bold">{count}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center gap-1 text-[9px] text-emerald-400/60 font-mono shrink-0">
+                    <CheckCheck className="w-3 h-3 text-emerald-400" />
+                    <span>Live</span>
+                  </div>
                 </div>
               </div>
             </div>
           );
         })}
+
+        {/* Live typing indicator */}
+        {partnerTyping?.isTyping && (
+          <div className="flex items-center gap-2 text-xs font-mono text-amber-300/90 py-1 px-2 animate-pulse bg-emerald-950/40 rounded-xl border border-emerald-800/40 w-fit">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <span>
+              {partnerTyping.user === 'leslye' ? 'Lady Leslye' : 'Sir Chif3n'} is inscribing a love scroll... ✍️
+            </span>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -365,7 +303,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
           {ROMANTIC_PRESETS.map((preset, idx) => (
             <button
               key={idx}
-              onClick={() => handleSendMessage(preset)}
+              onClick={() => handleSend(preset)}
               className="px-2.5 py-1 rounded-lg bg-[#041a0f] hover:bg-emerald-950 text-emerald-200 border border-emerald-800 text-[11px] font-serif transition-colors"
             >
               {preset}
@@ -378,7 +316,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          handleSendMessage();
+          handleSend();
         }}
         className="p-2.5 bg-[#03110b] border-t border-emerald-900/80 flex items-center gap-2"
       >
@@ -394,7 +332,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
         <input
           type="text"
           value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
+          onChange={handleInputChange}
           placeholder={`Inscribe love scroll as ${activeRole === 'leslye' ? 'Lady Leslye' : 'Sir Chif3n'}...`}
           className="flex-1 bg-[#020b06] border border-emerald-900/80 focus:border-amber-400/80 rounded-xl px-3 py-2 text-xs text-white placeholder-emerald-700/80 outline-none"
         />
@@ -403,7 +341,7 @@ export const LiveLoveScrollChatbox: React.FC<LiveLoveScrollChatboxProps> = ({
           type="submit"
           disabled={!inputText.trim()}
           className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-600 text-black font-bold disabled:opacity-40 shadow-md transition-all active:scale-95"
-          title="Send scroll to her phone/laptop"
+          title="Send scroll to partner in real time"
         >
           <Send className="w-4 h-4" />
         </button>

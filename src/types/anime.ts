@@ -27,6 +27,9 @@ export interface AnimeStudio {
 
 export interface AnimeItem {
   mal_id: number;
+  idMal?: number;
+  id?: number;
+  anilist_id?: number;
   title: string;
   title_english?: string | null;
   title_japanese?: string | null;

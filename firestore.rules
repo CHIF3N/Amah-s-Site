@@ -2,28 +2,53 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isValidScroll(data) {
+      return data.id is string
+        && data.sender is string
+        && data.sender.size() > 0
+        && data.timestamp is number;
+    }
+
+    function isValidArcadeState(data) {
+      return (('activeGame' in data && data.activeGame is string) || ('gameId' in data && data.gameId is string));
+    }
+
+    function isValidWhisperNote(data) {
+      return data.id is string
+        && data.text is string
+        && data.text.size() > 0
+        && data.timestamp is number;
+    }
+
+    function isValidDateNightItem(data) {
+      return data.id is string
+        && data.malId is number
+        && data.title is string;
+    }
+
     match /loveScrolls/{scrollId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isValidScroll(request.resource.data);
+      allow delete: if true;
     }
 
     match /coupleArcade/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow create, update: if isValidArcadeState(request.resource.data);
+      allow delete: if false;
     }
 
-    match /watchParty/{docId} {
-      allow read, write: if true;
+    match /whisperNotes/{noteId} {
+      allow read: if true;
+      allow create, update: if isValidWhisperNote(request.resource.data);
+      allow delete: if true;
     }
 
-    match /coupleStatus/{docId} {
-      allow read, write: if true;
-    }
-
-    match /timeCapsules/{capsuleId} {
-      allow read, write: if true;
-    }
-
-    match /coupleCall/{docId} {
-      allow read, write: if true;
+    match /dateNightQueue/{itemId} {
+      allow read: if true;
+      allow create, update: if isValidDateNightItem(request.resource.data);
+      allow delete: if true;
     }
   }
 }
+

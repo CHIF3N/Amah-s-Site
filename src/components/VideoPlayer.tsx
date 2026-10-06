@@ -51,10 +51,38 @@ export interface StreamServer {
   name: string;
   shortName: string;
   tag: string;
-  buildUrl: (malId: number, ep: number) => string;
+  buildUrl: (malId: number | string, ep: number) => string;
 }
 
 export const STREAM_SERVERS: StreamServer[] = [
+  {
+    id: 'vial-1',
+    name: 'VidSrc CC (Server 1 - Primary)',
+    shortName: 'VidSrc CC',
+    tag: '⚡ 1080p Ultra HD · High Speed CDN',
+    buildUrl: (id, ep) => `https://vidsrc.cc/v2/embed/anime/${id}/${ep || 1}`
+  },
+  {
+    id: 'vial-2',
+    name: 'EmbedSU (Server 2 - Multi-Audio)',
+    shortName: 'EmbedSU',
+    tag: 'Cloud Stream · Sub/Dub Multi-Audio',
+    buildUrl: (id, ep) => `https://embed.su/embed/anime/${id}/${ep || 1}`
+  },
+  {
+    id: 'vial-3',
+    name: 'VidSrc Direct (Server 3 - High Uptime)',
+    shortName: 'VidSrc Direct',
+    tag: 'Direct Resolver · High Uptime',
+    buildUrl: (id, ep) => `https://vidsrc.me/embed/anime?id=${id}&ep=${ep || 1}`
+  },
+  {
+    id: 'vial-4',
+    name: '2Embed (Server 4 - Direct Title Fallback)',
+    shortName: '2Embed',
+    tag: 'Imperial Direct Mirror',
+    buildUrl: (id, _ep) => `https://2embed.cc/embed/${id}`
+  },
   {
     id: 'vidlink-1',
     name: 'VidLink Pro (Reddit #1 Top Pick)',
@@ -63,43 +91,8 @@ export const STREAM_SERVERS: StreamServer[] = [
     buildUrl: (id, ep) => `https://vidlink.pro/anime/${id}/${ep || 1}`
   },
   {
-    id: 'vial-1',
-    name: 'VidSrc Alpha (Vial I - Primary)',
-    shortName: 'VidSrc Alpha',
-    tag: '1080p Ultra HD · High Speed CDN',
-    buildUrl: (id, ep) => `https://vidsrc.cc/v2/embed/anime/${id}/${ep || 1}`
-  },
-  {
-    id: 'vial-2',
-    name: 'EmbedSU (Vial II - Backup)',
-    shortName: 'EmbedSU',
-    tag: 'Cloud Stream · Sub/Dub Multi-Audio',
-    buildUrl: (id, ep) => `https://embed.su/embed/anime/${id}/${ep || 1}`
-  },
-  {
-    id: 'vial-3',
-    name: 'VidSrc Direct (Vial III - Fallback)',
-    shortName: 'VidSrc Direct',
-    tag: 'Direct Resolver · High Uptime',
-    buildUrl: (id, ep) => `https://vidsrc.me/embed/anime?id=${id}&ep=${ep || 1}`
-  },
-  {
-    id: 'vial-4',
-    name: '2Embed (Vial IV - Direct Mirror)',
-    shortName: '2Embed',
-    tag: 'Imperial Backup Mirror',
-    buildUrl: (id, ep) => `https://2embed.cc/embed/${id}`
-  },
-  {
-    id: 'vial-5',
-    name: 'MultiEmbed (Vial V - Fast Multi)',
-    shortName: 'MultiEmbed',
-    tag: 'Direct Multi-Server · Fast Loading',
-    buildUrl: (id, ep) => `https://multiembed.mov/?video_id=${id}&tmdb=0`
-  },
-  {
-    id: 'vial-6',
-    name: 'AutoEmbed (Vial VI - Clean Mobile)',
+    id: 'autoembed',
+    name: 'AutoEmbed (Clean Mobile)',
     shortName: 'AutoEmbed',
     tag: 'Low Latency · Mobile Stream',
     buildUrl: (id, ep) => `https://player.autoembed.cc/embed/anime/${id}/${ep || 1}`
@@ -164,20 +157,43 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const playerContainerRef = useRef<HTMLDivElement>(null);
   const recordedEpisodeRef = useRef<string | null>(null);
 
-  const animeId = anime?.mal_id || 54492;
+  // 1. RESOLVE THE CORRECT ANIME ID (MAL vs AniList)
+  // Check the active anime object: ensure it extracts anime.idMal || anime.mal_id || anime.id
+  const rawId = (anime as any)?.idMal || anime?.mal_id || (anime as any)?.id;
+  const cleanTitle = (anime?.title_english || anime?.title || '').trim();
+
+  // Defensive validation before setting iframe src:
+  // If the ID is missing, fall back to searching or querying by clean title rather than injecting "undefined"
+  const targetMalId: number | string =
+    rawId && !isNaN(Number(rawId)) && Number(rawId) > 0
+      ? Number(rawId)
+      : (cleanTitle ? encodeURIComponent(cleanTitle) : 54492);
+
+  // Ensure the episode number defaults safely to 1 (never 0 or undefined)
+  const currentEpisode = Math.max(1, Number(episode) || 1);
+
+  const animeId = typeof targetMalId === 'number' ? targetMalId : (anime?.mal_id || 54492);
   const animeTitle = anime?.title_english || anime?.title || 'Anime';
   const totalEps = anime?.episodes || 24;
   const currentServer = STREAM_SERVERS[selectedServerIndex] || STREAM_SERVERS[0];
-  const streamUrl = currentServer.buildUrl(animeId, episode);
+
+  // Construct clean embed route without trailing spaces
+  const computedEmbedUrl = currentServer.buildUrl(targetMalId, currentEpisode).trim();
+  const streamUrl = computedEmbedUrl;
+
+  // Log active target to console for debugging
+  useEffect(() => {
+    console.info(`[VideoPlayer] Current Stream Target: ID = ${targetMalId}, Ep = ${currentEpisode}, Server = ${currentServer.name}, URL = ${computedEmbedUrl}`);
+  }, [targetMalId, currentEpisode, currentServer.name, computedEmbedUrl]);
 
   // Safely record watch history once per anime + episode (prevents infinite re-render loop)
   useEffect(() => {
-    const key = `${anime?.mal_id}-${episode}`;
-    if (onMarkWatched && anime?.mal_id && recordedEpisodeRef.current !== key) {
+    const key = `${animeId}-${currentEpisode}`;
+    if (onMarkWatched && animeId && recordedEpisodeRef.current !== key) {
       recordedEpisodeRef.current = key;
-      onMarkWatched(anime.mal_id, episode);
+      onMarkWatched(animeId, currentEpisode);
     }
-  }, [anime?.mal_id, episode]);
+  }, [animeId, currentEpisode]);
 
   // Flash loader on change, then reveal player
   useEffect(() => {
@@ -437,6 +453,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         </div>
       </div>
 
+      {/* Debug Stream Target Badge (Temporarily visible for real-time verification) */}
+      <div className="px-3.5 py-1.5 bg-[#010905] border-b border-emerald-900/60 flex items-center justify-between text-[11px] font-mono text-emerald-400">
+        <span className="flex items-center gap-1.5 font-bold">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          Current Stream Target: ID = {targetMalId}, Ep = {currentEpisode}
+        </span>
+        <span className="text-[10px] text-zinc-400 font-sans">
+          Server: <span className="text-amber-300 font-mono">{currentServer.shortName}</span>
+        </span>
+      </div>
+
       {/* Main Player Viewport & Side Panel */}
       <div className="flex flex-col lg:flex-row bg-black">
         {/* Cinema Viewport */}
@@ -471,17 +498,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             */}
             <iframe
               id="anime-player-frame"
-              key={`stream-${streamUrl}-${reloadKey}-${directMode ? 'direct' : 'shielded'}`}
-              src={streamUrl}
+              key={`stream-${computedEmbedUrl}-${reloadKey}-${directMode ? 'direct' : 'shielded'}`}
+              src={computedEmbedUrl}
               onLoad={() => setIsFrameLoading(false)}
               className="w-full h-full border-0 aspect-video rounded-xl bg-black shadow-2xl"
               allowFullScreen={true}
               referrerPolicy="origin"
-              allow="autoplay; fullscreen; encrypted-media; picture-in-picture; clipboard-write"
+              allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
               sandbox={
                 directMode
                   ? undefined
-                  : "allow-scripts allow-same-origin allow-forms allow-presentation allow-top-navigation-by-user-activation"
+                  : "allow-scripts allow-same-origin allow-forms allow-presentation"
               }
             />
 

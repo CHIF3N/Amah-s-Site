@@ -10,6 +10,8 @@ interface DemigodLoveScrollsProps {
   leslyeNotes: Array<{ id: string; text: string; date: string }>;
   onAddLeslyeNote: (text: string) => void;
   onDeleteLeslyeNote: (id: string) => void;
+  activeRole?: 'chif3n' | 'leslye';
+  onRoleChange?: (role: 'chif3n' | 'leslye') => void;
 }
 
 export const DemigodLoveScrolls: React.FC<DemigodLoveScrollsProps> = ({
@@ -17,6 +19,8 @@ export const DemigodLoveScrolls: React.FC<DemigodLoveScrollsProps> = ({
   leslyeNotes,
   onAddLeslyeNote,
   onDeleteLeslyeNote,
+  activeRole,
+  onRoleChange,
 }) => {
   const [newNote, setNewNote] = useState('');
   const [activeStatementIndex, setActiveStatementIndex] = useState(0);
@@ -152,7 +156,10 @@ export const DemigodLoveScrolls: React.FC<DemigodLoveScrollsProps> = ({
           Messages sent here appear instantaneously on both Sir Chif3n's and Lady Leslye's screens in real time.
         </p>
 
-        <LiveLoveScrollChatbox />
+        <LiveLoveScrollChatbox
+          overrideRole={activeRole}
+          onRoleChange={onRoleChange}
+        />
       </section>
 
       {/* The Consecrated Scrolls Grid */}

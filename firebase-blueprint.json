@@ -43,16 +43,13 @@
           "type": "string",
           "description": "Optional image caption"
         },
+        "reactions": {
+          "type": "object",
+          "description": "Map of user reactions to this scroll"
+        },
         "timestamp": {
           "type": "number",
           "description": "Unix timestamp in milliseconds"
-        },
-        "readBy": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Array of participant roles who have opened and read this message (e.g. ['chif3n', 'leslye'])"
         }
       },
       "required": ["id", "sender", "timestamp"]
@@ -64,7 +61,7 @@
       "properties": {
         "gameId": {
           "type": "string",
-          "enum": ["tic-tac-toe", "gomoku", "trivia", "telepathy", "alchemy"],
+          "enum": ["tic-tac-toe", "gomoku", "trivia", "telepathy", "alchemy", "couples-telepathy", "potion-craft", "silhouette-duel"],
           "description": "Active game identifier"
         },
         "turn": {
@@ -91,22 +88,73 @@
       },
       "required": ["gameId", "turn"]
     },
-    "CoupleCallSession": {
-      "title": "CoupleCallSession",
-      "description": "Real-time voice and video call signaling session between Sir Chif3n and Lady Leslye",
+    "WhisperNote": {
+      "title": "WhisperNote",
+      "description": "A personal whisper or diary note inscribed in Lady Leslye's Herbal Diary",
       "type": "object",
       "properties": {
-        "callId": { "type": "string" },
-        "callerRole": { "type": "string", "enum": ["chif3n", "leslye"] },
-        "receiverRole": { "type": "string", "enum": ["chif3n", "leslye"] },
-        "type": { "type": "string", "enum": ["audio", "video"] },
-        "status": { "type": "string", "enum": ["calling", "connected", "ended", "declined"] },
-        "timestamp": { "type": "number" },
-        "offer": { "type": "string" },
-        "answer": { "type": "string" },
-        "candidate": { "type": "string" }
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the note"
+        },
+        "text": {
+          "type": "string",
+          "description": "Content of the note"
+        },
+        "sender": {
+          "type": "string",
+          "description": "Author of the whisper"
+        },
+        "date": {
+          "type": "string",
+          "description": "Formatted date string"
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "Unix timestamp in milliseconds"
+        }
       },
-      "required": ["callId", "callerRole", "status", "timestamp"]
+      "required": ["id", "text", "timestamp"]
+    },
+    "DateNightQueueItem": {
+      "title": "DateNightQueueItem",
+      "description": "An anime series added to the couple date night watchlist with comments and ratings",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the queue item"
+        },
+        "malId": {
+          "type": "number",
+          "description": "MyAnimeList anime ID"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the anime series"
+        },
+        "image": {
+          "type": "string",
+          "description": "Poster image URL"
+        },
+        "addedAt": {
+          "type": "number",
+          "description": "Timestamp when added"
+        },
+        "watched": {
+          "type": "boolean",
+          "description": "Whether already watched together"
+        },
+        "ourRating": {
+          "type": "number",
+          "description": "Couple rating out of 5"
+        },
+        "coupleComment": {
+          "type": "string",
+          "description": "Private romantic commentary or notes"
+        }
+      },
+      "required": ["id", "malId", "title"]
     }
   },
   "firestore": {
@@ -118,9 +166,13 @@
       "schema": "ArcadeCloudState",
       "description": "Shared real-time state document for the 2-player imperial games across devices"
     },
-    "/coupleCall/{docId}": {
-      "schema": "CoupleCallSession",
-      "description": "Shared real-time WebRTC audio and video call signaling document between the couple"
+    "/whisperNotes/{noteId}": {
+      "schema": "WhisperNote",
+      "description": "Collection of whispers and journal notes in Lady Leslye's Herbal Diary synced across devices"
+    },
+    "/dateNightQueue/{itemId}": {
+      "schema": "DateNightQueueItem",
+      "description": "Collection of date night anime queue entries synced between Sir Chif3n and Lady Leslye"
     }
   }
 }
